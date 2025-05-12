@@ -17,31 +17,45 @@ const APPID = "1358852517"; // your appid;
  */
 const LICENSE_KEY = "62dc005f0f91fe840eb38bd26bd978e7"; // your licenseKey;
 
-/**
- * This Token is the secret key used for calculating the signature.
- *
- * Obtain a Token by creating a project at [Web License Management] (https://console.tencentcloud.com/magic/web)
- */
-const token = "47a92265fa5d610342c208cc0d901860"; // 'your token';
-
 /** ----------------------- */
 
 /**
  * Obtain Signature Function
  *
- * WARNING: This is only for demo and debugging purposes.
- * In the production environment, please keep the Token on the server side and migrate the signature calculation method to the server side.
- * The signature can be obtained by calling the Interface from the front end.
- *
- * eg：
- * async function () {
- *  return fetch('http://xxx.com/get-ar-sign').then(res => res.json());
- * };
+ * Fetches the signature from a secure backend endpoint.
  */
-const getSignature = function () {
-  const timestamp = Math.round(new Date().getTime() / 1000);
-  const signature = sha256(timestamp + token + APPID + timestamp).toUpperCase();
-  return { signature, timestamp };
+const getSignature = async function () {
+  // REEMPLAZA ESTA URL con la URL real de tu endpoint de backend desplegado
+  const backendSignatureUrl = 'https://TU_ENDPOINT_DE_BACKEND_AQUI.com/get-ar-sign';
+
+  try {
+    const response = await fetch(backendSignatureUrl, {
+      method: 'POST', // o 'GET', según cómo hayas diseñado tu backend
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Puedes enviar el APPID si tu backend lo espera, o si el backend ya lo conoce
+      body: JSON.stringify({ appId: APPID }) 
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error from backend:', response.status, errorText);
+      throw new Error(`Failed to get signature from server: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.signature || typeof data.timestamp === 'undefined') {
+      console.error('Invalid response from signature server:', data);
+      throw new Error('Invalid signature data from server');
+    }
+    return { signature: data.signature, timestamp: data.timestamp };
+  } catch (error) {
+    console.error('Error fetching signature:', error);
+    // Es importante que el SDK de AR sepa que la autenticación falló.
+    // Lanzar el error o devolver una promesa rechazada es una forma.
+    throw error; 
+  }
 };
 
 let width = 405;
@@ -121,7 +135,7 @@ ar.on("created", () => {
 });
 
 ar.on("ready", async (e) => {
-  if (!APPID || !LICENSE_KEY || !token) {
+  if (!APPID || !LICENSE_KEY) {
     throw new Error("please enter APPID and LICENSE_KEY");
   }
   const mediaStream = await ar.getOutput();
