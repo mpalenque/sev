@@ -86,8 +86,6 @@
   <div class="controls">
     <button id="webcamButton">ENABLE WEBCAM</button>
     <button id="takePhotoButton" style="margin-top: 10px;">TAKE PHOTO</button>
-    <label for="smoothnessSlider">Smoothness:</label>
-    <input type="range" id="smoothnessSlider" min="0" max="20" value="5">
   </div>
 
   <script type="module">
@@ -99,68 +97,54 @@
     let runningMode = "VIDEO";
     const video = document.getElementById("webcam");
     const canvasElement = document.getElementById("output_canvas");
-    const canvasCtx = canvasElement.getContext("2d", { alpha: true }); // Removed willReadFrequently
+    const canvasCtx = canvasElement.getContext("2d", { alpha: true });
     const webcamButton = document.getElementById("webcamButton");
-    const smoothnessSlider = document.getElementById("smoothnessSlider");
     const loadingMessage = document.getElementById("loadingMessage");
-    const takePhotoButton = document.getElementById("takePhotoButton"); // New button reference
+    const takePhotoButton = document.getElementById("takePhotoButton");
 
-    const blurScaleFactor = 0.5; // Process blur on an image 50% of original size
-    const landmarkMaskScaleFactor = 0.5; // New: Scale factor for landmark masks
-    const landmarkMaskBlurRadius = 3; // New: Blur radius for landmark masks (applied to scaled-down mask)
-    const SLIDER_POWER_CURVE = 3; // Power for non-linear slider response (e.g., 2 for quadratic)
+    const blurScaleFactor = 0.5; 
+    const landmarkMaskScaleFactor = 0.5; 
+    const landmarkMaskBlurRadius = 3; 
+    const SLIDER_POWER_CURVE = 3; 
+    const RAW_SLIDER_DEFAULT_VALUE = 0.8; // New constant for the desired default raw value
+    const SLIDER_MAX_VALUE = 20; // Original max value of the slider
 
-    // Function to calculate effective blur amount based on slider's raw value
     function calculateEffectiveBlur(rawValue, sliderMax, power) {
-      if (sliderMax === 0) return 0; // Avoid division by zero
+      if (sliderMax === 0) return 0; 
       const normalizedValue = rawValue / sliderMax;
       return Math.pow(normalizedValue, power) * sliderMax;
     }
 
+    // Set blurAmount using the new default raw value
     let blurAmount = calculateEffectiveBlur(
-      parseFloat(smoothnessSlider.value),
-      parseFloat(smoothnessSlider.max),
+      RAW_SLIDER_DEFAULT_VALUE,
+      SLIDER_MAX_VALUE,
       SLIDER_POWER_CURVE
     );
 
-    smoothnessSlider.addEventListener("input", (event) => {
-      blurAmount = calculateEffectiveBlur(
-        parseFloat(event.target.value),
-        parseFloat(smoothnessSlider.max),
-        SLIDER_POWER_CURVE
-      );
-    });
-
-    // Offscreen canvases
     const blurredVideoCanvas = document.createElement("canvas");
-    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true }); // Removed willReadFrequently
+    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true });
     const maskCanvas = document.createElement("canvas");
-    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true }); // Removed willReadFrequently
+    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true });
     const effectLayerCanvas = document.createElement("canvas");
-    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true }); // Removed willReadFrequently
+    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true });
 
-    // New canvas for eye mask
     const eyeMaskCanvas = document.createElement("canvas");
-    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true }); // Removed willReadFrequently
+    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true });
 
-    // New canvas for the face oval mask
     const faceOvalMaskCanvas = document.createElement("canvas");
-    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true }); // Removed willReadFrequently
+    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true });
 
-    // New: Declare tempBlurLayerCanvas and tempBlurLayerCtx globally
     let tempBlurLayerCanvas;
     let tempBlurLayerCtx;
 
-    // New: Canvases for person segmentation (background removal)
     const personMaskCanvas = document.createElement("canvas");
     const personMaskCtx = personMaskCanvas.getContext("2d");
     const personOnlyCanvas = document.createElement("canvas");
     const personOnlyCtx = personOnlyCanvas.getContext("2d");
 
-    // For selfie_multiclass_256x256 model
-    // Categories: 0:background, 1:hair, 2:body-skin, 3:face-skin, 4:clothes, 5:others
-    const skinCategoryIndices = [3]; // REVERTED: Target only face-skin for smoothing
-    const personCategoryIndices = [1, 2, 3, 4]; // Hair, body-skin, face-skin, clothes for background removal
+    const skinCategoryIndices = [3];
+    const personCategoryIndices = [1, 2, 3, 4];
 
     async function createMediaPipeTasks() {
       loadingMessage.textContent = 'Initializing MediaPipe tasks...';
@@ -178,7 +162,6 @@
       }
       console.log("FilesetResolver loaded.");
 
-      // Create ImageSegmenter
       let imageSegmenterDelegate = "GPU";
       try {
         loadingMessage.textContent = 'Loading Image Segmenter model (GPU)...';
@@ -218,7 +201,6 @@
         }
       }
 
-      // Create FaceLandmarker
       let faceLandmarkerDelegate = "GPU";
       try {
         loadingMessage.textContent = `Loading Face Landmarker model (GPU)... (Image Segmenter: ${imageSegmenterDelegate})`;
@@ -291,7 +273,6 @@
           
           const startPredictionLogic = () => {
             console.log(`Video 'playing' event fired. Raw dimensions: ${video.videoWidth}x${video.videoHeight}`);
-            // Remove the event listener after it has run once
             video.removeEventListener("playing", startPredictionLogic);
 
             if (video.videoWidth === 0 || video.videoHeight === 0) {
@@ -306,23 +287,19 @@
             canvasElement.width = video.videoWidth;
             canvasElement.height = video.videoHeight;
             
-            // Set blurredVideoCanvas to a scaled down size
             blurredVideoCanvas.width = video.videoWidth * blurScaleFactor;
             blurredVideoCanvas.height = video.videoHeight * blurScaleFactor;
             
             effectLayerCanvas.width = video.videoWidth;
             effectLayerCanvas.height = video.videoHeight;
-            eyeMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; // Modified
-            eyeMaskCanvas.height = video.videoHeight * landmarkMaskScaleFactor; // Modified
-            faceOvalMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; // Modified
-            faceOvalMaskCanvas.height = video.videoHeight * landmarkMaskScaleFactor; // Modified
-            // maskCanvas and personMaskCanvas will be set by drawMaskFromPixelData based on segmentation output size
+            eyeMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; 
+            eyeMaskCanvas.height = video.videoHeight * landmarkMaskScaleFactor; 
+            faceOvalMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; 
+            faceOvalMaskCanvas.height = video.videoHeight * landmarkMaskScaleFactor; 
 
-            // New: Initialize personOnlyCanvas size
             personOnlyCanvas.width = video.videoWidth;
             personOnlyCanvas.height = video.videoHeight;
 
-            // New: Initialize tempBlurLayerCanvas and tempBlurLayerCtx
             if (!tempBlurLayerCanvas) {
                 tempBlurLayerCanvas = document.createElement('canvas');
                 tempBlurLayerCtx = tempBlurLayerCanvas.getContext('2d');
@@ -348,7 +325,7 @@
             console.error("Video play failed:", e);
             loadingMessage.textContent = 'Error playing video. Check permissions.';
             webcamButton.disabled = false;
-            video.removeEventListener("playing", startPredictionLogic); // Clean up listener on error
+            video.removeEventListener("playing", startPredictionLogic); 
           });
 
         } catch (err) {
@@ -366,13 +343,11 @@
     }
     webcamButton.addEventListener("click", enableCam);
 
-    // Helper function to convert Data URL to Blob
     async function dataURLtoBlob(dataurl) {
       const res = await fetch(dataurl);
       return await res.blob();
     }
 
-    // Handle Take Photo button click
     async function handleTakePhotoClick() {
       if (!isPredicting || !video.srcObject || video.paused || video.ended) {
         alert("Please enable the webcam and ensure it's active before taking a photo.");
@@ -391,7 +366,7 @@
 
         const dataUrl = await new Promise((resolve, reject) => {
           const backgroundImage = new Image();
-          backgroundImage.src = 'sev.png'; // Path to your background image
+          backgroundImage.src = 'sev.png';
 
           backgroundImage.onload = () => {
             const cw = photoCanvas.width;
@@ -404,23 +379,20 @@
 
             let dx = 0, dy = 0, dWidth = 0, dHeight = 0;
 
-            // Calculate dimensions to mimic background-size: cover and background-position: center
-            if (canvasRatio > imageRatio) { // Canvas is wider or less tall than image (proportionally)
+            if (canvasRatio > imageRatio) {
               dHeight = ch;
               dWidth = iw * (ch / ih);
               dx = (cw - dWidth) / 2;
               dy = 0;
-            } else { // Canvas is taller or less wide than image (proportionally)
+            } else {
               dWidth = cw;
               dHeight = ih * (cw / iw);
               dx = 0;
               dy = (ch - dHeight) / 2;
             }
 
-            // Draw background image
             photoCtx.drawImage(backgroundImage, dx, dy, dWidth, dHeight);
 
-            // Draw the current canvas content (person with effects) on top
             photoCtx.drawImage(canvasElement, 0, 0, cw, ch);
 
             resolve(photoCanvas.toDataURL("image/png"));
@@ -428,8 +400,6 @@
 
           backgroundImage.onerror = (err) => {
             console.error("Error loading background image 'sev.png'. Proceeding without custom background.", err);
-            // Fallback: Draw the original canvas content directly onto photoCanvas.
-            // This will preserve transparency if canvasElement has it.
             photoCtx.drawImage(canvasElement, 0, 0, photoCanvas.width, photoCanvas.height);
             resolve(photoCanvas.toDataURL("image/png"));
           };
@@ -450,7 +420,6 @@
           console.log("Photo shared successfully or share dialog opened.");
         } else {
           console.warn("Web Share API not supported or cannot share this data. Falling back to download.");
-          // Fallback: Download the image
           const link = document.createElement("a");
           link.href = dataUrl;
           link.download = fileName;
@@ -462,8 +431,7 @@
       } catch (error) {
         console.error("Error taking or sharing photo:", error);
         alert(`Error: ${error.message}`);
-        // Fallback for error during share (e.g., user cancelled)
-        if (error.name !== 'AbortError') { // AbortError means user cancelled share dialog
+        if (error.name !== 'AbortError') {
             const dataUrl = canvasElement.toDataURL("image/png");
             const link = document.createElement("a");
             link.href = dataUrl;
@@ -533,7 +501,7 @@
       }
 
       let startTimeMs = performance.now();
-      let segmentationResultsToClose = null; // To ensure close is called
+      let segmentationResultsToClose = null;
 
       if (video.currentTime !== lastVideoTime) {
         lastVideoTime = video.currentTime;
@@ -547,9 +515,7 @@
         console.log("Landmark results:", landmarkResults);
 
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        // canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height); // Original drawing, will be replaced
 
-        // --- Background Removal Step ---
         let personDrawnSuccessfully = false;
         if (segmentationResults && segmentationResults.categoryMask) {
           const fullMask = segmentationResults.categoryMask;
@@ -558,42 +524,31 @@
           const fullMaskHeight = fullMask.height;
 
           if (fullMaskPixelData && fullMaskWidth > 0 && fullMaskHeight > 0) {
-            // Ensure personMaskCanvas is sized correctly
             if (personMaskCanvas.width !== fullMaskWidth || personMaskCanvas.height !== fullMaskHeight) {
               personMaskCanvas.width = fullMaskWidth;
               personMaskCanvas.height = fullMaskHeight;
             }
-            // Create a mask for the entire person
             drawMaskFromPixelData(fullMaskPixelData, fullMaskWidth, fullMaskHeight, personMaskCtx, personCategoryIndices);
 
-            // Draw video to personOnlyCanvas
             personOnlyCtx.clearRect(0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
             personOnlyCtx.drawImage(video, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
-            // Apply person mask to make background transparent
             personOnlyCtx.globalCompositeOperation = 'destination-in';
             personOnlyCtx.drawImage(personMaskCanvas, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
-            personOnlyCtx.globalCompositeOperation = 'source-over'; // Reset composite operation
+            personOnlyCtx.globalCompositeOperation = 'source-over';
 
-            // Draw the person (with transparent background) to the main canvas
             canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height);
             personDrawnSuccessfully = true;
           }
         }
 
         if (!personDrawnSuccessfully) {
-          // Fallback: if person segmentation failed, draw the original video
           console.warn("[predictWebcam] Person segmentation failed or no mask. Drawing raw video.");
           canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
         }
-        // --- End Background Removal Step ---
 
-        // --- Skin Smoothing Step (Applied on top of whatever is on canvasCtx) ---
         if (segmentationResults && segmentationResults.categoryMask && landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
           console.log("CategoryMask available for smoothing:", !!segmentationResults.categoryMask);
           console.log("FaceLandmarks available for smoothing:", landmarkResults.faceLandmarks.length);
-          // Note: skinMaskPixelData, skinMaskWidth, skinMaskHeight are already available from the earlier part of this block
-          // if we assume segmentationResults.categoryMask is the same one.
-          // For clarity, let's re-access it, though it's the same data.
           const skinMaskForSmoothing = segmentationResults.categoryMask;
           const skinMaskPixelData = skinMaskForSmoothing.getAsUint8Array();
           const skinMaskWidth = skinMaskForSmoothing.width;
@@ -603,8 +558,6 @@
 
           if (skinMaskPixelData && skinMaskWidth > 0 && skinMaskHeight > 0) {
             blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
-            // Draw the *original video* frame downscaled onto the smaller blurredVideoCanvas for blurring
-            // Apply canvas filter for blur instead of StackBlur
             const originalFilterBlurredVideo = blurredVideoCtx.filter;
             if (blurAmount > 0) {
                 blurredVideoCtx.filter = `blur(${blurAmount}px)`;
@@ -612,26 +565,23 @@
                 blurredVideoCtx.filter = 'none';
             }
             blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
-            blurredVideoCtx.filter = originalFilterBlurredVideo; // Reset filter
+            blurredVideoCtx.filter = originalFilterBlurredVideo;
 
-            // Ensure maskCanvas is sized correctly based on segmentation output (for skin)
             if (maskCanvas.width !== skinMaskWidth || maskCanvas.height !== skinMaskHeight) {
                 maskCanvas.width = skinMaskWidth;
                 maskCanvas.height = skinMaskHeight;
             }
-            drawMaskFromPixelData(skinMaskPixelData, skinMaskWidth, skinMaskHeight, maskCanvasCtx, skinCategoryIndices); // Use skinCategoryIndices
+            drawMaskFromPixelData(skinMaskPixelData, skinMaskWidth, skinMaskHeight, maskCanvasCtx, skinCategoryIndices);
 
             eyeMaskCtx.clearRect(0, 0, eyeMaskCanvas.width, eyeMaskCanvas.height);
             eyeMaskCtx.fillStyle = 'white';
             
-            // Apply filter for blurring mask shapes
             const originalFilterEye = eyeMaskCtx.filter;
             if (landmarkMaskBlurRadius > 0) {
                 eyeMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
             }
 
-            // Draw feature polygons (eyes, lips, eyebrows) onto eyeMaskCanvas
-            function drawLandmarkPolygon(landmarkConnections, targetCtx, targetCanvas) { // Added targetCtx and targetCanvas
+            function drawLandmarkPolygon(landmarkConnections, targetCtx, targetCanvas) {
               if (landmarks && landmarkConnections && landmarkConnections.length > 0) {
                 targetCtx.beginPath();
                 const firstLandmarkIndex = landmarkConnections[0].start;
@@ -655,7 +605,31 @@
               }
             }
 
-            function drawTriangleOnMask(vertexIndices, targetCtx, targetCanvas) { // Added targetCtx and targetCanvas
+            function drawCustomLandmarkPolygonFromIndices(vertexIndices, targetCtx, targetCanvas) {
+              if (landmarks && vertexIndices && vertexIndices.length > 0) {
+                targetCtx.beginPath();
+                const firstLandmarkIndex = vertexIndices[0];
+                if (landmarks[firstLandmarkIndex]) {
+                  const firstPoint = landmarks[firstLandmarkIndex];
+                  targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
+                  for (let i = 1; i < vertexIndices.length; i++) {
+                    const landmarkIndex = vertexIndices[i];
+                    if (landmarks[landmarkIndex]) {
+                      const point = landmarks[landmarkIndex];
+                      targetCtx.lineTo(point.x * targetCanvas.width, point.y * targetCanvas.height);
+                    } else {
+                      console.warn(`Landmark index ${landmarkIndex} not found in custom list.`);
+                    }
+                  }
+                  targetCtx.closePath();
+                  targetCtx.fill();
+                } else {
+                  console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point in custom list.`);
+                }
+              }
+            }
+
+            function drawTriangleOnMask(vertexIndices, targetCtx, targetCanvas) {
               if (landmarks && vertexIndices && vertexIndices.length === 3) {
                 const points = vertexIndices.map(index => landmarks[index]);
                 if (points.every(p => p)) {
@@ -671,7 +645,6 @@
               }
             }
 
-            // Draw features to be excluded from blur onto eyeMaskCanvas
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, eyeMaskCtx, eyeMaskCanvas);
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, eyeMaskCtx, eyeMaskCanvas);
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
@@ -691,46 +664,42 @@
             ];
             specificEyebrowTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
 
-            eyeMaskCtx.filter = originalFilterEye; // Reset filter for eyeMaskCtx
+            const additionalEyeVertices = [7,22,23,24,25,26,27,28,29,30,33,56,110,112,130,133,144,145,153,154,155,157,158,159,160,161,163,173,190,243,246,247];
+            drawCustomLandmarkPolygonFromIndices(additionalEyeVertices, eyeMaskCtx, eyeMaskCanvas);
 
-            // Draw the face oval mask
+            const additionalOtherEyeVertices = [249,252,253,254,255,256,257,258,259,260,263,286,339,341,359,362,373,374,380,381,382,384,385,386,387,388,390,398,414,463,466,467];
+            drawCustomLandmarkPolygonFromIndices(additionalOtherEyeVertices, eyeMaskCtx, eyeMaskCanvas);
+
+            eyeMaskCtx.filter = originalFilterEye;
+
             faceOvalMaskCtx.clearRect(0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height);
             faceOvalMaskCtx.fillStyle = 'white';
             
-            // Apply filter for blurring mask shape
             const originalFilterOval = faceOvalMaskCtx.filter;
             if (landmarkMaskBlurRadius > 0) {
                 faceOvalMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
             }
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, faceOvalMaskCtx, faceOvalMaskCanvas);
-            faceOvalMaskCtx.filter = originalFilterOval; // Reset filter for faceOvalMaskCtx
+            faceOvalMaskCtx.filter = originalFilterOval;
 
             effectLayerCtx.clearRect(0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-            // Start with the face-skin mask (from ImageSegmenter, skinCategoryIndices = [3])
             effectLayerCtx.drawImage(maskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
             
-            // Intersect with the face oval mask (keeps only skin within the face oval)
             effectLayerCtx.globalCompositeOperation = 'destination-in';
             effectLayerCtx.drawImage(faceOvalMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
             
-            // Subtract the eyes, lips, and eyebrows
             effectLayerCtx.globalCompositeOperation = 'destination-out';
             effectLayerCtx.drawImage(eyeMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
             
-            // Reset composite operation
             effectLayerCtx.globalCompositeOperation = 'source-over';
 
-            // New: Clear the reused tempBlurLayerCtx
             tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
 
-            // Draw the (smaller) blurredVideoCanvas, scaling it up to full size
             tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
             tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
-            tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height); // REVERTED: Use effectLayerCanvas
+            tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
             tempBlurLayerCtx.globalCompositeOperation = 'source-over';
 
-            // Draw the smoothing effect layer onto the main canvas
-            // This will be drawn on top of the person (who has a transparent background)
             canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0);
 
           } else {
