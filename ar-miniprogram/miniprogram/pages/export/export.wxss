@@ -1,0 +1,37 @@
+/* pages/export/export.wxss */
+.main-container{
+    background-color: rgba(0, 0, 0, 1);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    /* justify-content: center; */
+    align-items: center;
+}
+.video-container {
+    height: 1334rpx;
+    width: 750rpx;
+    position: relative;
+}
+.navi-back {
+    position: fixed;
+    top: 48rpx;
+    left: 20rpx;
+    z-index: 999;
+    width: 60rpx;
+    height: 60rpx;
+}
+
+.navi-back .icon-back {
+    width: 60rpx;
+    height: 60rpx;
+}
+
+.opt-btn{
+    position: absolute;
+    bottom: 20rpx;
+    left: 50%;
+    width: 200rpx !important;
+    margin-left: -100rpx !important;
+    box-sizing: border-box;
+}

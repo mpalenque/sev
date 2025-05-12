@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/camera/camera",
+    "pages/export/export"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "Weixin",
+    "navigationBarTextStyle": "black"
+  },
+  "style": "v2",
+  "darkmode": true,
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "workers": "miniprogram_npm/tencentcloud-webar/worker"
+}

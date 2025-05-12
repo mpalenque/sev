@@ -1,0 +1,74 @@
+<view class="main-container">
+  <view class="camera-canvas-container" id="camera-canvas-container">
+    <camera
+      bindinitdone="onCameraReady"
+      device-position="front"
+      frame-size="large"
+      flash="off"
+      resolution="medium"
+      style="width: 750rpx; height: 1334rpx;position:absolute;top:-9999px;"
+    />
+    <canvas
+      canvas-id="main-canvas"
+      id="main-canvas"
+      type="webgl"
+      style="width: 750rpx; height: 1334rpx;"
+    ></canvas>
+    <view style="margin-top: 20px">
+      <button size="mini" style="margin-left:20px" bindtap="onClickBeautyIcon">Beauty</button>
+      <button size="mini" style="margin-left:20px" bindtap="onClickMakeupIcon">makeups</button>
+      <button size="mini" style="margin-left:20px" bindtap="onClickStickerIcon">sticker</button>
+      <button size="mini" style="margin-left:20px" bindtap="onClickFilterIcon">filter</button>
+      <button size="mini" style="margin-left:20px" type="primary" bindtap="onClickRecord">
+        {{recordStatus==='recording'?"Stop":"shooting"}}
+      </button>
+      <view style="display:inline-block;margin-left:20rpx"
+        >{{recordStatus==='recording'?'Recording...':''}}</view
+      >
+    </view>
+  </view>
+  <view
+    wx:if="{{showFilter||showMakeup||showSticker||showBeauty}}"
+    class="mask"
+    bindtap="onClickMask"
+  ></view>
+  <view
+    class="beauty-container {{ showBeauty===true?'fadeinup':(showBeauty===false?'fadeoutdown':'')}}"
+  >
+    <view wx:for="{{beautyOptions}}" wx:key="key" class="beauty-item">
+      <view class="beauty-name">{{item.name}}</view>
+      <slider
+        data-key="{{item.key}}"
+        class="beauty-slider"
+        value="{{beautyValue[item.key]*100}}"
+        min="{{0}}"
+        max="{{100}}"
+        block-size="16"
+        step="1"
+        show-value
+        bindchange="onChangeBeauty"
+      />
+    </view>
+  </view>
+  <view class="filter-container">
+    <scroll-list
+      inputData="{{filterList}}"
+      show="{{showFilter}}"
+      bindchanged="onChangeFilter"
+    ></scroll-list>
+  </view>
+  <view class="sticker-container">
+    <scroll-list
+      inputData="{{stickerList}}"
+      show="{{showSticker}}"
+      bindchanged="onChangeMakeup"
+    ></scroll-list>
+  </view>
+  <view class="sticker-container">
+    <scroll-list
+      inputData="{{makeupList}}"
+      show="{{showMakeup}}"
+      bindchanged="onChangeSticker"
+    ></scroll-list>
+  </view>
+</view>

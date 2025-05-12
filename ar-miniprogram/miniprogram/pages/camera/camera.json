@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "scroll-list": "../../components/scroll-list"
+  },
+  "disableScroll": true,
+  "navigationStyle": "custom"
+}
