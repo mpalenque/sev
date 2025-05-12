@@ -378,9 +378,63 @@
         alert("Please enable the webcam and ensure it's active before taking a photo.");
         return;
       }
+      if (canvasElement.width === 0 || canvasElement.height === 0) {
+        alert("Canvas dimensions are zero. Cannot take photo. Please ensure webcam is properly initialized.");
+        return;
+      }
 
       try {
-        const dataUrl = canvasElement.toDataURL("image/png");
+        const photoCanvas = document.createElement('canvas');
+        photoCanvas.width = canvasElement.width;
+        photoCanvas.height = canvasElement.height;
+        const photoCtx = photoCanvas.getContext('2d');
+
+        const dataUrl = await new Promise((resolve, reject) => {
+          const backgroundImage = new Image();
+          backgroundImage.src = 'sev.png'; // Path to your background image
+
+          backgroundImage.onload = () => {
+            const cw = photoCanvas.width;
+            const ch = photoCanvas.height;
+            const iw = backgroundImage.naturalWidth;
+            const ih = backgroundImage.naturalHeight;
+
+            const canvasRatio = cw / ch;
+            const imageRatio = iw / ih;
+
+            let dx = 0, dy = 0, dWidth = 0, dHeight = 0;
+
+            // Calculate dimensions to mimic background-size: cover and background-position: center
+            if (canvasRatio > imageRatio) { // Canvas is wider or less tall than image (proportionally)
+              dHeight = ch;
+              dWidth = iw * (ch / ih);
+              dx = (cw - dWidth) / 2;
+              dy = 0;
+            } else { // Canvas is taller or less wide than image (proportionally)
+              dWidth = cw;
+              dHeight = ih * (cw / iw);
+              dx = 0;
+              dy = (ch - dHeight) / 2;
+            }
+
+            // Draw background image
+            photoCtx.drawImage(backgroundImage, dx, dy, dWidth, dHeight);
+
+            // Draw the current canvas content (person with effects) on top
+            photoCtx.drawImage(canvasElement, 0, 0, cw, ch);
+
+            resolve(photoCanvas.toDataURL("image/png"));
+          };
+
+          backgroundImage.onerror = (err) => {
+            console.error("Error loading background image 'sev.png'. Proceeding without custom background.", err);
+            // Fallback: Draw the original canvas content directly onto photoCanvas.
+            // This will preserve transparency if canvasElement has it.
+            photoCtx.drawImage(canvasElement, 0, 0, photoCanvas.width, photoCanvas.height);
+            resolve(photoCanvas.toDataURL("image/png"));
+          };
+        });
+
         const blob = await dataURLtoBlob(dataUrl);
         const fileName = "photo.png";
         const file = new File([blob], fileName, { type: "image/png" });
