@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Skin Smoothing with MediaPipe ImageSegmenter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> <style>
+  html {
+    height: 100%;
+  }
+
+  body {
+    font-family: "Inter", Arial, sans-serif; /* Added Inter font */
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #131313;
+    /* Ensure sevBG.png is in the same directory or provide a correct path */
+    /* El usuario debe proporcionar esta imagen: sevBG.png */
+    background-image: url('sevBG.png'); 
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center center;
+    overflow-x: hidden;
+    color: #e0e0e0; /* Default text color for better contrast */
+  }
+  #liveViewContainer {
+    position: relative;
+    border: 1px solid #2b2b2b;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    background-color: rgba(31, 31, 31, 0.5); /* Semi-transparent background for the container */
+    padding: 10px;
+    border-radius: 12px; /* Slightly more rounded corners */
+    width: 90%;
+    max-width: 700px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px; /* Space before controls */
+  }
+  video {
+    display: none; /* Video element is hidden, content drawn to canvas */
+  }
+  canvas#output_canvas {
+    display: block;
+    border: 1px solid #444; /* Slightly lighter border for canvas */
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px; /* Rounded corners for the canvas */
+    background-color: #000; /* Black background for canvas before video draws */
+  }
+  .controls {
+    margin-top: 15px;
+    padding: 20px; /* Increased padding */
+    background-color: rgba(31, 31, 31, 0.8); /* Semi-transparent background */
+    border-radius: 12px; /* Slightly more rounded corners */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* Enhanced shadow */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 90%;
+    max-width: 700px;
+  }
+  .controls button {
+    padding: 12px 20px; /* Increased padding */
+    font-size: 16px;
+    font-weight: bold; /* Bolder text */
+    cursor: pointer;
+    border: none;
+    border-radius: 8px; /* More rounded corners */
+    background-color: #a48353;
+    color: #ffffff;
+    margin-bottom: 12px; /* Adjusted margin */
+    transition: background-color 0.3s ease, transform 0.1s ease; /* Smooth transitions */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Button shadow */
+  }
+  .controls button:hover {
+    background-color: #b89564; /* Lighter shade for hover */
+    transform: translateY(-1px); /* Slight lift on hover */
+  }
+  .controls button:active {
+    transform: translateY(1px); /* Press effect */
+    background-color: #8c6f47;
+  }
+  .controls label {
+    margin-bottom: 8px; /* Adjusted margin */
+    color: #ffffff;
+    font-size: 14px; /* Slightly smaller label */
+  }
+  .controls input[type="range"] {
+    width: 220px; /* Slightly wider */
+    accent-color: #a48353;
+    cursor: pointer;
+  }
+  #loadingMessage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2em;
+    color: #131313;
+    background-color: rgba(255, 255, 255, 0.95); /* Slightly more opaque */
+    padding: 15px 20px; /* Increased padding */
+    border-radius: 8px;
+    display: none;
+    text-align: center;
+    z-index: 10; /* Ensure it's on top */
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 600px) {
+    body {
+      padding: 10px;
+    }
+    #liveViewContainer, .controls {
+      width: 95%;
+    }
+    .controls button {
+      font-size: 14px;
+      padding: 10px 15px;
+    }
+    .controls input[type="range"] {
+      width: 180px;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <div id="liveViewContainer">
+    <video id="webcam" autoplay playsinline muted></video> <canvas id="output_canvas"></canvas> <div id="loadingMessage">Cargando modelo y cámara web...</div>
+  </div>
+
+  <div class="controls">
+    <button id="webcamButton">ACTIVAR CÁMARA WEB</button>
+    <button id="takePhotoButton" style="margin-top: 10px;">TOMAR FOTO</button>
+    <label for="blurSlider">Cantidad de Desenfoque:</label>
+    <input type="range" id="blurSlider" min="0" max="1" step="0.01" value="0.8">
+  </div>
+
+  <script type="module">
+    // Import necessary MediaPipe components
+    import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+    const { ImageSegmenter, FaceLandmarker, FilesetResolver } = vision;
+
+    // DOM Elements
+    const video = document.getElementById("webcam");
+    const canvasElement = document.getElementById("output_canvas");
+    const canvasCtx = canvasElement.getContext("2d", { alpha: true }); // Main canvas context
+    const webcamButton = document.getElementById("webcamButton");
+    const loadingMessage = document.getElementById("loadingMessage");
+    const takePhotoButton = document.getElementById("takePhotoButton");
+    const blurSlider = document.getElementById("blurSlider");
+
+    // MediaPipe task instances and configuration
+    let imageSegmenter;
+    let faceLandmarker;
+    let runningMode = "VIDEO"; // Processing mode: IMAGE or VIDEO
+    let isPredicting = false; // Flag to control the prediction loop
+    let lastVideoTime = -1;   // Timestamp of the last processed video frame
+
+    // Configuration constants for the blur effect
+    const blurScaleFactor = 0.5; // Scale down video for blur processing (performance)
+    const landmarkMaskScaleFactor = 0.5; // Scale for landmark-based masks
+    const landmarkMaskBlurRadius = 3; // Blur radius for feature masks (eyes, mouth)
+    const SLIDER_POWER_CURVE = 3; // Power curve for slider sensitivity
+    const SLIDER_MAX_VALUE = 20;  // Maximum effective blur pixel radius
+
+    // Calculate initial blur amount based on slider default
+    let blurAmount = calculateEffectiveBlur(parseFloat(blurSlider.value), 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
+
+    // Offscreen canvases for various processing stages
+    const blurredVideoCanvas = document.createElement("canvas"); 
+    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const maskCanvas = document.createElement("canvas"); 
+    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const effectLayerCanvas = document.createElement("canvas"); 
+    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const eyeMaskCanvas = document.createElement("canvas"); 
+    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const faceOvalMaskCanvas = document.createElement("canvas"); 
+    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    let tempBlurLayerCanvas; 
+    let tempBlurLayerCtx;    
+
+    const personMaskCanvas = document.createElement("canvas"); 
+    const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+    const personOnlyCanvas = document.createElement("canvas"); 
+    const personOnlyCtx = personOnlyCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    // Indices for different categories from the selfie_multiclass model
+    const skinCategoryIndices = [3]; // Assuming category 3 is skin
+    const personCategoryIndices = [1, 2, 3]; // Assuming categories 1,2,3 cover the person
+
+    // Function to calculate effective blur amount from slider value
+    function calculateEffectiveBlur(rawValue, sliderMax, power) {
+      if (sliderMax === 0) return 0;
+      const normalizedValue = rawValue / sliderMax;
+      return Math.pow(normalizedValue, power) * sliderMax;
+    }
+
+    // Initializes MediaPipe ImageSegmenter and FaceLandmarker tasks
+    async function createMediaPipeTasks() {
+      loadingMessage.textContent = 'Inicializando tareas de MediaPipe...';
+      loadingMessage.style.display = 'block';
+      console.log("Attempting to create MediaPipe tasks...");
+
+      let visionFilesetResolver;
+      try {
+        visionFilesetResolver = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        );
+      } catch (e) {
+        console.error("Failed to load FilesetResolver for Vision Tasks:", e);
+        loadingMessage.textContent = 'Error: No se pudieron cargar las tareas de visión de MediaPipe. Revisa la consola.';
+        return; 
+      }
+      console.log("FilesetResolver loaded successfully.");
+
+      let imageSegmenterDelegate = "GPU";
+      try {
+        loadingMessage.textContent = 'Cargando modelo Image Segmenter (GPU)...';
+        const segmenterStartTime = performance.now();
+        imageSegmenter = await ImageSegmenter.createFromOptio

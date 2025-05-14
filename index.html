@@ -3,96 +3,81 @@
 <head>
 <meta charset="utf-8">
 <title>Skin Smoothing with MediaPipe ImageSegmenter</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"> <style>
-  html {
+<style>
+  html { /* New rule */
     height: 100%;
   }
 
   body {
-    font-family: "Inter", Arial, sans-serif; /* Added Inter font */
-    margin: 0;
-    padding: 20px;
-    box-sizing: border-box;
-    min-height: 100%;
+    font-family: Arial, sans-serif;
+    margin: 0; /* Changed from 20px */
+    padding: 20px; /* Added for content spacing */
+    box-sizing: border-box; /* Added for better sizing control */
+    min-height: 100%; /* Ensure body takes full viewport height */
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #131313;
-    /* Ensure sevBG.png is in the same directory or provide a correct path */
-    background-image: url('sevBG.png'); /* User should provide this image */
-    background-size: cover;
-    background-repeat: no-repeat;
+    background-color: #131313; 
+    background-image: url('sevBG.png');
+    background-size: cover; 
+    background-repeat: no-repeat; 
     background-position: center center;
-    overflow-x: hidden;
-    color: #e0e0e0; /* Default text color for better contrast */
+    overflow-x: hidden; /* Added to prevent horizontal scroll on small overflows */
   }
   #liveViewContainer {
     position: relative;
-    border: 1px solid #2b2b2b;
+    border: 1px solid #2b2b2b; 
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    background-color: rgba(31, 31, 31, 0.5); /* Semi-transparent background for the container */
+    background-color: transparent; 
     padding: 10px;
-    border-radius: 12px; /* Slightly more rounded corners */
-    width: 90%;
-    max-width: 700px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 20px; /* Space before controls */
+    border-radius: 8px;
+    width: 90%; /* Added for responsiveness */
+    max-width: 700px; /* Added for a sensible max content width */
+    display: flex; /* Added to help center canvas */
+    justify-content: center; /* Added to center canvas */
+    align-items: center; /* Added to center canvas */
   }
   video {
-    display: none; /* Video element is hidden, content drawn to canvas */
+    display: none; /* Hide video element, we'll draw to canvas */
   }
-  canvas#output_canvas {
+  canvas#output_canvas { /* Selector made more specific */
     display: block;
-    border: 1px solid #444; /* Slightly lighter border for canvas */
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px; /* Rounded corners for the canvas */
-    background-color: #000; /* Black background for canvas before video draws */
+    border: 1px solid #2b2b2b; 
+    max-width: 100%; /* Added to ensure it scales down to fit container */
+    height: auto;    /* Added to maintain aspect ratio when scaling */
   }
   .controls {
     margin-top: 15px;
-    padding: 20px; /* Increased padding */
-    background-color: rgba(31, 31, 31, 0.8); /* Semi-transparent background */
-    border-radius: 12px; /* Slightly more rounded corners */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* Enhanced shadow */
+    padding: 15px;
+    background-color: #1f1f1f; 
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 90%;
-    max-width: 700px;
+    width: 90%; /* Added for responsiveness */
+    max-width: 700px; /* Added for a sensible max content width */
   }
   .controls button {
-    padding: 12px 20px; /* Increased padding */
+    padding: 10px 15px;
     font-size: 16px;
-    font-weight: bold; /* Bolder text */
     cursor: pointer;
     border: none;
-    border-radius: 8px; /* More rounded corners */
-    background-color: #a48353;
-    color: #ffffff;
-    margin-bottom: 12px; /* Adjusted margin */
-    transition: background-color 0.3s ease, transform 0.1s ease; /* Smooth transitions */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Button shadow */
+    border-radius: 5px;
+    background-color: #a48353; /* Updated */
+    color: #ffffff; /* Updated */
+    margin-bottom: 10px;
   }
   .controls button:hover {
-    background-color: #b89564; /* Lighter shade for hover */
-    transform: translateY(-1px); /* Slight lift on hover */
-  }
-  .controls button:active {
-    transform: translateY(1px); /* Press effect */
-    background-color: #8c6f47;
+    background-color: #8c6f47; /* Darker shade of #a48353 for hover */
   }
   .controls label {
-    margin-bottom: 8px; /* Adjusted margin */
-    color: #ffffff;
-    font-size: 14px; /* Slightly smaller label */
+    margin-bottom: 5px;
+    color: #ffffff; /* Updated */
   }
   .controls input[type="range"] {
-    width: 220px; /* Slightly wider */
-    accent-color: #a48353;
-    cursor: pointer;
+    width: 200px;
+    accent-color: #a48353; /* Updated */
   }
   #loadingMessage {
     position: absolute;
@@ -100,37 +85,21 @@
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 1.2em;
-    color: #131313;
-    background-color: rgba(255, 255, 255, 0.95); /* Slightly more opaque */
-    padding: 15px 20px; /* Increased padding */
-    border-radius: 8px;
-    display: none;
-    text-align: center;
-    z-index: 10; /* Ensure it's on top */
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 600px) {
-    body {
-      padding: 10px;
-    }
-    #liveViewContainer, .controls {
-      width: 95%;
-    }
-    .controls button {
-      font-size: 14px;
-      padding: 10px 15px;
-    }
-    .controls input[type="range"] {
-      width: 180px;
-    }
+    color: #131313; /* Updated */
+    background-color: rgba(255, 255, 255, 0.9); /* Updated for better readability */
+    padding: 10px;
+    border-radius: 5px;
+    display: none; /* Hidden by default */
   }
 </style>
 </head>
 <body>
+  
 
   <div id="liveViewContainer">
-    <video id="webcam" autoplay playsinline muted></video> <canvas id="output_canvas"></canvas> <div id="loadingMessage">Loading model and webcam...</div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output_canvas" width="640" height="480"></canvas>
+    <div id="loadingMessage">Loading model and webcam...</div>
   </div>
 
   <div class="controls">
@@ -141,92 +110,76 @@
   </div>
 
   <script type="module">
-    // Import necessary MediaPipe components
-    import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
-    const { ImageSegmenter, FaceLandmarker, FilesetResolver } = vision;
+    import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"; // Changed import style
+    const { ImageSegmenter, FaceLandmarker, FilesetResolver } = vision; // Destructure necessary components
 
-    // DOM Elements
+    let imageSegmenter;
+    let faceLandmarker;
+    let runningMode = "VIDEO";
     const video = document.getElementById("webcam");
     const canvasElement = document.getElementById("output_canvas");
-    const canvasCtx = canvasElement.getContext("2d", { alpha: true }); // Main canvas context
+    const canvasCtx = canvasElement.getContext("2d", { alpha: true });
     const webcamButton = document.getElementById("webcamButton");
     const loadingMessage = document.getElementById("loadingMessage");
     const takePhotoButton = document.getElementById("takePhotoButton");
     const blurSlider = document.getElementById("blurSlider");
 
-    // MediaPipe task instances and configuration
-    let imageSegmenter;
-    let faceLandmarker;
-    let runningMode = "VIDEO"; // Processing mode: IMAGE or VIDEO
-    let isPredicting = false; // Flag to control the prediction loop
-    let lastVideoTime = -1;   // Timestamp of the last processed video frame
+    const blurScaleFactor = 0.5; 
+    const landmarkMaskScaleFactor = 0.5; 
+    const landmarkMaskBlurRadius = 3; 
+    const SLIDER_POWER_CURVE = 3; 
+    const RAW_SLIDER_DEFAULT_VALUE = 0.8; // This constant remains but is not used for the direct blurAmount setting below.
+    const SLIDER_MAX_VALUE = 20; // This constant remains but is not used for the direct blurAmount setting below.
 
-    // Configuration constants for the blur effect
-    const blurScaleFactor = 0.5; // Scale down video for blur processing (performance)
-    const landmarkMaskScaleFactor = 0.5; // Scale for landmark-based masks
-    const landmarkMaskBlurRadius = 3; // Blur radius for feature masks (eyes, mouth)
-    const SLIDER_POWER_CURVE = 3; // Power curve for slider sensitivity
-    const SLIDER_MAX_VALUE = 20;  // Maximum effective blur pixel radius
-
-    // Calculate initial blur amount based on slider default
-    let blurAmount = calculateEffectiveBlur(parseFloat(blurSlider.value), 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
-
-    // Offscreen canvases for various processing stages
-    // These help in compositing effects without re-rendering everything repeatedly
-    const blurredVideoCanvas = document.createElement("canvas"); // For the scaled-down, raw video frame before blurring
-    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-
-    const maskCanvas = document.createElement("canvas"); // For the skin segmentation mask
-    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-
-    const effectLayerCanvas = document.createElement("canvas"); // For the combined mask (skin - features)
-    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-
-    const eyeMaskCanvas = document.createElement("canvas"); // Mask for eyes, eyebrows, lips to exclude from blur
-    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-
-    const faceOvalMaskCanvas = document.createElement("canvas"); // Mask for the face oval
-    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-
-    let tempBlurLayerCanvas; // Canvas for applying the blur effect itself
-    let tempBlurLayerCtx;    // Context for tempBlurLayerCanvas
-
-    const personMaskCanvas = document.createElement("canvas"); // Mask for the entire person
-    const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-    const personOnlyCanvas = document.createElement("canvas"); // Canvas to draw only the segmented person
-    const personOnlyCtx = personOnlyCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
-
-    // Indices for different categories from the selfie_multiclass model
-    const skinCategoryIndices = [3]; // Assuming category 3 is skin
-    const personCategoryIndices = [1, 2, 3]; // Assuming categories 1,2,3 cover the person
-
-    // Function to calculate effective blur amount from slider value
     function calculateEffectiveBlur(rawValue, sliderMax, power) {
-      if (sliderMax === 0) return 0;
+      if (sliderMax === 0) return 0; 
       const normalizedValue = rawValue / sliderMax;
       return Math.pow(normalizedValue, power) * sliderMax;
     }
 
-    // Initializes MediaPipe ImageSegmenter and FaceLandmarker tasks
+    // Initial blurAmount set by the slider's default value, calculated effectively
+    let blurAmount = calculateEffectiveBlur(parseFloat(blurSlider.value), 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
+
+    const blurredVideoCanvas = document.createElement("canvas");
+    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+    const maskCanvas = document.createElement("canvas");
+    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+    const effectLayerCanvas = document.createElement("canvas");
+    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const eyeMaskCanvas = document.createElement("canvas");
+    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const faceOvalMaskCanvas = document.createElement("canvas");
+    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    let tempBlurLayerCanvas;
+    let tempBlurLayerCtx; // Will be initialized with willReadFrequently in enableCam
+
+    const personMaskCanvas = document.createElement("canvas");
+    const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+    const personOnlyCanvas = document.createElement("canvas");
+    const personOnlyCtx = personOnlyCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const skinCategoryIndices = [3];
+    const personCategoryIndices = [1, 2, 3];
+
     async function createMediaPipeTasks() {
       loadingMessage.textContent = 'Initializing MediaPipe tasks...';
       loadingMessage.style.display = 'block';
       console.log("Attempting to create MediaPipe tasks...");
-
       let visionFilesetResolver;
       try {
-        // Load WASM resources for MediaPipe Vision Tasks
         visionFilesetResolver = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
         );
       } catch (e) {
         console.error("Failed to load FilesetResolver for Vision Tasks:", e);
         loadingMessage.textContent = 'Error: Could not load MediaPipe vision tasks. Check console.';
-        return; // Critical failure
+        return;
       }
-      console.log("FilesetResolver loaded successfully.");
+      console.log("FilesetResolver loaded.");
 
-      // Attempt to create ImageSegmenter with GPU, fallback to CPU
       let imageSegmenterDelegate = "GPU";
       try {
         loadingMessage.textContent = 'Loading Image Segmenter model (GPU)...';
@@ -237,8 +190,8 @@
             delegate: "GPU"
           },
           runningMode: runningMode,
-          outputCategoryMask: true, // Need this for segmentation
-          outputConfidenceMasks: false // Not using confidence masks
+          outputCategoryMask: true,
+          outputConfidenceMasks: false
         });
         const segmenterLoadTime = performance.now() - segmenterStartTime;
         console.log(`ImageSegmenter (GPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms.`);
@@ -249,7 +202,7 @@
         try {
           const segmenterStartTime = performance.now();
           imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
-            baseOptions: { // Same model, different delegate
+            baseOptions: {
               modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
               delegate: "CPU"
             },
@@ -262,11 +215,10 @@
         } catch (cpuError) {
           console.error("Failed to create ImageSegmenter with CPU delegate after GPU failure:", cpuError);
           loadingMessage.textContent = 'Error: Could not load Image Segmenter (GPU & CPU). Check console.';
-          return; // Critical failure
+          return;
         }
       }
 
-      // Attempt to create FaceLandmarker with GPU, fallback to CPU
       let faceLandmarkerDelegate = "GPU";
       try {
         loadingMessage.textContent = `Loading Face Landmarker model (GPU)... (Image Segmenter: ${imageSegmenterDelegate})`;
@@ -276,10 +228,10 @@
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
             delegate: "GPU"
           },
-          outputFaceBlendshapes: false, // Not needed for this effect
-          outputFacialTransformationMatrixes: false, // Not needed
+          outputFaceBlendshapes: false,
+          outputFacialTransformationMatrixes: false,
           runningMode: runningMode,
-          numFaces: 1 // Optimize for a single face
+          numFaces: 1
         });
         const landmarkerLoadTime = performance.now() - landmarkerStartTime;
         console.log(`FaceLandmarker (GPU) created successfully in ${landmarkerLoadTime.toFixed(2)}ms.`);
@@ -290,7 +242,7 @@
         try {
           const landmarkerStartTime = performance.now();
           faceLandmarker = await FaceLandmarker.createFromOptions(visionFilesetResolver, {
-            baseOptions: { // Same model, different delegate
+            baseOptions: {
               modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
               delegate: "CPU"
             },
@@ -304,100 +256,60 @@
         } catch (cpuError) {
           console.error("Failed to create FaceLandmarker with CPU delegate after GPU failure:", cpuError);
           loadingMessage.textContent = `Error: Could not load Face Landmarker (GPU & CPU). Image Segmenter: ${imageSegmenterDelegate}. Check console.`;
-          return; // Critical failure
+          return;
         }
       }
       
       loadingMessage.textContent = `Models loaded (Segmenter: ${imageSegmenterDelegate}, Landmarker: ${faceLandmarkerDelegate}).`;
-      console.log(`All models loaded. ImageSegmenter: ${imageSegmenterDelegate}, FaceLandmarker: ${faceLandmarkerDelegate}`);
-      // Hide loading message after a short delay
       setTimeout(() => {
-          if (loadingMessage.textContent.startsWith("Models loaded")) { // Check if it's still the success message
+          if (loadingMessage.textContent === `Models loaded (Segmenter: ${imageSegmenterDelegate}, Landmarker: ${faceLandmarkerDelegate}).`) {
             loadingMessage.style.display = 'none';
           }
-      }, 2000); // Increased timeout for better visibility
+      }, 1500); // Increased timeout slightly
     }
 
-    // Enables or disables the webcam and starts/stops the prediction loop
     async function enableCam() {
-      webcamButton.disabled = true; // Disable button during setup
-
-      // Ensure MediaPipe tasks are initialized
       if (!imageSegmenter || !faceLandmarker) {
-        loadingMessage.textContent = 'Models not yet loaded. Initializing...';
+        loadingMessage.textContent = 'Models not yet loaded. Please wait...';
         loadingMessage.style.display = 'block';
-        console.log("enableCam: Models not loaded, calling createMediaPipeTasks.");
         await createMediaPipeTasks();
-        // Check again if models loaded successfully
         if (!imageSegmenter || !faceLandmarker) {
-            console.error("enableCam: MediaPipe tasks failed to initialize after attempt. Cannot enable webcam features.");
-            loadingMessage.textContent = 'Error: Model initialization failed. Cannot start webcam.';
-            // Do not hide loading message here, as it shows an error
-            webcamButton.disabled = false; // Re-enable button
+            console.error("MediaPipe tasks failed to initialize. Cannot enable webcam features.");
+            webcamButton.disabled = false;
             return;
         }
       }
 
       if (webcamButton.textContent === "ENABLE WEBCAM") {
+        webcamButton.disabled = true;
         loadingMessage.textContent = 'Accessing webcam...';
         loadingMessage.style.display = 'block';
-        console.log("enableCam: Attempting to access webcam.");
-
-        const constraints = { video: { facingMode: "user" } }; // Prefer front camera
+        const constraints = { video: true };
         try {
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
           video.srcObject = stream;
           
-          // This function sets up canvases and starts prediction once video is playing
-          const startPredictionLogic = async () => {
+          const startPredictionLogic = () => {
             console.log(`Video 'playing' event fired. Raw dimensions: ${video.videoWidth}x${video.videoHeight}`);
-            // It's possible the event fires multiple times or before dimensions are stable.
-            // Remove listener to prevent multiple executions for the same stream start.
             video.removeEventListener("playing", startPredictionLogic);
 
-            // Critical check for video dimensions. iOS might be slow to report these.
             if (video.videoWidth === 0 || video.videoHeight === 0) {
-                console.error("CRITICAL: Video dimensions are zero at 'playing' event. Effect will likely fail. Retrying dimension check shortly...");
-                loadingMessage.textContent = 'Error: Video stream has zero dimensions. Trying to stabilize...';
+                console.error("CRITICAL: Video dimensions are zero at 'playing' event. Effect will likely fail.");
+                loadingMessage.textContent = 'Error: Video stream has zero dimensions.';
                 loadingMessage.style.display = 'block';
-                // Retry mechanism for dimensions
-                let attempts = 0;
-                const maxAttempts = 10; // Try for ~2 seconds
-                const intervalId = setInterval(() => {
-                    attempts++;
-                    if (video.videoWidth > 0 && video.videoHeight > 0) {
-                        clearInterval(intervalId);
-                        console.log(`Video dimensions stabilized after ${attempts} attempts: ${video.videoWidth}x${video.videoHeight}`);
-                        setupCanvasesAndStartPrediction();
-                    } else if (attempts >= maxAttempts) {
-                        clearInterval(intervalId);
-                        console.error("CRITICAL: Video dimensions remained zero after multiple attempts.");
-                        loadingMessage.textContent = 'Error: Failed to get video dimensions. Please try again.';
-                        webcamButton.disabled = false;
-                        isPredicting = false; 
-                        stopWebcamStream(); // Clean up
-                    }
-                }, 200); // Check every 200ms
+                webcamButton.disabled = false;
+                isPredicting = false; 
                 return;
             }
             
-            setupCanvasesAndStartPrediction();
-          };
-
-          const setupCanvasesAndStartPrediction = () => {
-            console.log(`Setting up canvases with video dimensions: ${video.videoWidth}x${video.videoHeight}`);
-            // Set main canvas dimensions
             canvasElement.width = video.videoWidth;
             canvasElement.height = video.videoHeight;
             
-            // Set dimensions for offscreen processing canvases
             blurredVideoCanvas.width = video.videoWidth * blurScaleFactor;
             blurredVideoCanvas.height = video.videoHeight * blurScaleFactor;
             
             effectLayerCanvas.width = video.videoWidth;
             effectLayerCanvas.height = video.videoHeight;
-
-            // Landmark masks are scaled
             eyeMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; 
             eyeMaskCanvas.height = video.videoHeight * landmarkMaskScaleFactor; 
             faceOvalMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; 
@@ -405,105 +317,74 @@
 
             personOnlyCanvas.width = video.videoWidth;
             personOnlyCanvas.height = video.videoHeight;
-            
-            // Ensure personMaskCanvas dimensions are set (will be updated if segmenter output differs, but good to init)
-            personMaskCanvas.width = video.videoWidth; 
-            personMaskCanvas.height = video.videoHeight;
 
-
-            // Initialize tempBlurLayerCanvas if it hasn't been already
             if (!tempBlurLayerCanvas) {
                 tempBlurLayerCanvas = document.createElement('canvas');
-                // Crucial: willReadFrequently for canvas that is source of getImageData or drawImage to another canvas frequently
                 tempBlurLayerCtx = tempBlurLayerCanvas.getContext('2d', {willReadFrequently: true, alpha: true});
             }
             tempBlurLayerCanvas.width = video.videoWidth;
             tempBlurLayerCanvas.height = video.videoHeight;
 
-            loadingMessage.style.display = 'none'; // Hide loading message
+            loadingMessage.style.display = 'none';
             webcamButton.textContent = "DISABLE WEBCAM";
-            webcamButton.disabled = false; // Re-enable button
+            webcamButton.disabled = false;
             
-            console.log("[setupCanvasesAndStartPrediction] Setting isPredicting = true.");
+            console.log("[startPredictionLogic] Setting isPredicting = true.");
             isPredicting = true; 
-            lastVideoTime = -1; // Reset last video time
-            console.log("[setupCanvasesAndStartPrediction] Calling predictWebcam for the first time.");
-            predictWebcam(); // Start the prediction loop
-          }
+            console.log("[startPredictionLogic] Calling predictWebcam for the first time.");
+            predictWebcam();
+          };
 
           video.addEventListener("playing", startPredictionLogic);
           
-          // Muting the video element is often required for autoplay on mobile browsers
-          video.muted = true; 
           video.play().then(() => {
             console.log("Video play() promise resolved. Playback should be starting or started.");
-            // The 'playing' event will handle the rest.
           }).catch(e => {
-            console.error("Video play() failed:", e);
-            loadingMessage.textContent = 'Error playing video. Check permissions & browser settings.';
-            // Do not hide loading message as it's an error state
-            webcamButton.disabled = false; // Re-enable button
-            video.removeEventListener("playing", startPredictionLogic); // Clean up listener
-            stopWebcamStream();
+            console.error("Video play failed:", e);
+            loadingMessage.textContent = 'Error playing video. Check permissions.';
+            webcamButton.disabled = false;
+            video.removeEventListener("playing", startPredictionLogic); 
           });
 
         } catch (err) {
           console.error("Error accessing webcam: ", err);
           loadingMessage.textContent = 'Error accessing webcam. Please allow access and try again.';
-          // Do not hide loading message
-          webcamButton.disabled = false; // Re-enable button
+          webcamButton.disabled = false;
         }
-      } else { // "DISABLE WEBCAM" was clicked
-        console.log("enableCam: Disabling webcam.");
-        stopWebcamStream();
+      } else {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
         webcamButton.textContent = "ENABLE WEBCAM";
-        webcamButton.disabled = false;
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Clear the canvas
-        isPredicting = false; // Stop prediction loop
-        console.log("Webcam disabled, prediction loop stopped.");
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        isPredicting = false;
       }
     }
-
-    function stopWebcamStream() {
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-            console.log("Webcam stream stopped.");
-        }
-        video.pause(); // Explicitly pause
-        video.removeAttribute('src'); // Remove src attribute as well
-    }
-
-
-    // Event listener for the webcam button
     webcamButton.addEventListener("click", enableCam);
-    // Event listener for the take photo button
     takePhotoButton.addEventListener("click", handleTakePhotoClick);
-    // Event listener for the blur slider
+
     blurSlider.addEventListener("input", (event) => {
-      const rawValue = parseFloat(event.target.value);
+      const rawValue = parseFloat(event.target.value); // Slider value is 0 to 1
+      // Map the 0-1 slider range to a 0-SLIDER_MAX_VALUE effective blur range
+      // The calculateEffectiveBlur function expects a rawValue that is part of its own max (which is 1 here for the slider)
+      // and then we scale it up by SLIDER_MAX_VALUE.
       blurAmount = calculateEffectiveBlur(rawValue, 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
-      console.log(`Blur slider changed. Raw: ${rawValue}, Calculated blurAmount: ${blurAmount.toFixed(2)}`);
+      console.log(`Blur slider changed. Raw: ${rawValue}, Calculated blurAmount: ${blurAmount}`);
     });
 
-    // Converts a data URL to a Blob object
     async function dataURLtoBlob(dataurl) {
       const res = await fetch(dataurl);
       return await res.blob();
     }
 
-    // Handles the "Take Photo" button click
     async function handleTakePhotoClick() {
       if (!isPredicting || !video.srcObject || video.paused || video.ended) {
-        // Using a custom styled message box instead of alert
-        showModalMessage("Please enable the webcam and ensure it's active before taking a photo.");
+        alert("Please enable the webcam and ensure it's active before taking a photo.");
         return;
       }
       if (canvasElement.width === 0 || canvasElement.height === 0) {
-        showModalMessage("Canvas dimensions are zero. Cannot take photo. Please ensure webcam is properly initialized.");
+        alert("Canvas dimensions are zero. Cannot take photo. Please ensure webcam is properly initialized.");
         return;
       }
-      console.log("handleTakePhotoClick: Capturing photo from canvasElement.");
 
       try {
         const photoCanvas = document.createElement('canvas');
@@ -511,15 +392,11 @@
         photoCanvas.height = canvasElement.height;
         const photoCtx = photoCanvas.getContext('2d');
 
-        // Promise to handle background image loading
         const dataUrl = await new Promise((resolve, reject) => {
           const backgroundImage = new Image();
-          // IMPORTANT: Replace 'sevBG.png' with a valid path or a placeholder if the image might not exist
-          // For example, use a placeholder service or a default background color.
-          backgroundImage.src = 'sevBG.png'; // User needs to provide this image
+          backgroundImage.src = 'sevBG.png';
 
           backgroundImage.onload = () => {
-            console.log("Background image 'sevBG.png' loaded successfully for photo.");
             const cw = photoCanvas.width;
             const ch = photoCanvas.height;
             const iw = backgroundImage.naturalWidth;
@@ -530,183 +407,141 @@
 
             let dx = 0, dy = 0, dWidth = 0, dHeight = 0;
 
-            // Logic to draw background image with 'cover' behavior
-            if (canvasRatio > imageRatio) { // Canvas is wider than image
+            if (canvasRatio > imageRatio) {
               dHeight = ch;
               dWidth = iw * (ch / ih);
               dx = (cw - dWidth) / 2;
               dy = 0;
-            } else { // Canvas is taller or same aspect ratio
+            } else {
               dWidth = cw;
               dHeight = ih * (cw / iw);
               dx = 0;
               dy = (ch - dHeight) / 2;
             }
+
             photoCtx.drawImage(backgroundImage, dx, dy, dWidth, dHeight);
-            // Draw the current filtered video frame on top
+
             photoCtx.drawImage(canvasElement, 0, 0, cw, ch);
+
             resolve(photoCanvas.toDataURL("image/png"));
           };
 
           backgroundImage.onerror = (err) => {
-            console.warn("Error loading background image 'sevBG.png'. Proceeding without custom background for photo.", err);
-            // Fallback: just draw the canvas content without the background
+            console.error("Error loading background image 'sevBG.png'. Proceeding without custom background.", err);
             photoCtx.drawImage(canvasElement, 0, 0, photoCanvas.width, photoCanvas.height);
             resolve(photoCanvas.toDataURL("image/png"));
           };
         });
 
         const blob = await dataURLtoBlob(dataUrl);
-        const fileName = "smoothed_photo.png"; // More descriptive name
+        const fileName = "photo.png";
         const file = new File([blob], fileName, { type: "image/png" });
         
         const shareData = {
           files: [file],
-          title: "My Smoothed Photo",
-          text: "Check out this photo with a smooth skin effect!",
+          title: "My Photo",
+          text: "Check out this photo I took!",
         };
 
-        // Attempt to use Web Share API
         if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-          console.log("Attempting to share photo using Web Share API.");
           await navigator.share(shareData);
           console.log("Photo shared successfully or share dialog opened.");
         } else {
           console.warn("Web Share API not supported or cannot share this data. Falling back to download.");
-          // Fallback to download if Web Share is not available
           const link = document.createElement("a");
           link.href = dataUrl;
           link.download = fileName;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          showModalMessage("Photo downloaded as Web Share is not available.");
+          alert("Photo downloaded as Web Share is not available.");
         }
       } catch (error) {
         console.error("Error taking or sharing photo:", error);
-        if (error.name === 'AbortError') {
-            showModalMessage("Photo sharing was cancelled.");
-        } else {
-            showModalMessage(`Error during photo process: ${error.message}. Trying to download directly.`);
-            // Fallback download on other errors
-            try {
-                const dataUrl = canvasElement.toDataURL("image/png");
-                const link = document.createElement("a");
-                link.href = dataUrl;
-                link.download = "photo_fallback.png";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                showModalMessage("Sharing failed. Photo downloaded instead.");
-            } catch (downloadError) {
-                console.error("Fallback download also failed:", downloadError);
-                showModalMessage("Photo capture and download failed. Please check console.");
-            }
+        alert(`Error: ${error.message}`);
+        if (error.name !== 'AbortError') {
+            const dataUrl = canvasElement.toDataURL("image/png");
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = "photo_fallback.png";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            alert("Sharing failed. Photo downloaded instead.");
         }
       }
     }
 
-    // Helper function to show a modal message (replaces alert)
-    function showModalMessage(message) {
-        // Simple implementation: use the existing loadingMessage element
-        // For a more robust solution, you'd create a dedicated modal element
-        const msgElement = loadingMessage; // Re-using for simplicity
-        msgElement.textContent = message;
-        msgElement.style.display = 'block';
-        msgElement.style.backgroundColor = 'rgba(255, 200, 200, 0.95)'; // Error/warning color
-        msgElement.style.color = '#000';
-
-        setTimeout(() => {
-            msgElement.style.display = 'none';
-            // Reset styles if it was an error message
-            msgElement.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-            msgElement.style.color = '#131313';
-        }, 4000); // Hide after 4 seconds
-    }
-
-
-    // Draws a mask from raw pixel data onto a target canvas context
     function drawMaskFromPixelData(maskPixelData, maskWidth, maskHeight, targetCtx, targetIndices) {
       if (!maskPixelData || maskPixelData.length === 0) {
-        console.warn("drawMaskFromPixelData: Invalid or empty maskPixelData received.");
+        console.error("Invalid or empty maskPixelData received in drawMaskFromPixelData");
         targetCtx.clearRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
         return;
       }
       
-      // Ensure target canvas dimensions match mask dimensions
       if (targetCtx.canvas.width !== maskWidth || targetCtx.canvas.height !== maskHeight) {
           targetCtx.canvas.width = maskWidth;
           targetCtx.canvas.height = maskHeight;
-          console.log(`Resized target canvas for mask to ${maskWidth}x${maskHeight}`);
       }
 
       const newImageData = targetCtx.createImageData(maskWidth, maskHeight);
       const newPixelData = newImageData.data; 
 
       if (maskPixelData.length !== maskWidth * maskHeight) {
-          console.error(`drawMaskFromPixelData: maskPixelData.length (${maskPixelData.length}) does not match maskWidth*maskHeight (${maskWidth*maskHeight}). Cannot draw mask.`);
+          console.error(`maskPixelData.length (${maskPixelData.length}) does not match maskWidth*maskHeight (${maskWidth*maskHeight}).`);
           targetCtx.clearRect(0, 0, targetCtx.canvas.width, targetCtx.canvas.height);
           return;
       }
 
-      // Iterate through mask pixels and set opacity based on category
       for (let i = 0; i < maskPixelData.length; i++) {
-        const category = maskPixelData[i]; // Value from the segmentation mask
-        const offset = i * 4; // Each pixel has 4 components (R,G,B,A)
+        const category = maskPixelData[i];
+        const offset = i * 4;
         if (targetIndices.includes(category)) {
-          newPixelData[offset] = 0;     // R (color doesn't matter for mask, alpha is key)
+          newPixelData[offset] = 0;     // R (can be any color, alpha is key)
           newPixelData[offset + 1] = 0; // G
           newPixelData[offset + 2] = 0; // B
-          newPixelData[offset + 3] = 255; // Alpha: Opaque for desired regions
+          newPixelData[offset + 3] = 255; // Alpha: Opaque for skin
         } else {
-          newPixelData[offset + 3] = 0;   // Alpha: Transparent for other regions
+          newPixelData[offset + 3] = 0;   // Alpha: Transparent for non-skin
         }
       }
       targetCtx.putImageData(newImageData, 0, 0);
     }
 
+    let lastVideoTime = -1;
+    let isPredicting = false;
 
-    // Main prediction loop for video processing
     async function predictWebcam() {
-      // Initial checks to ensure prediction should continue
+      console.log(`[predictWebcam START] isPredicting: ${isPredicting}, video.paused: ${video.paused}, video.ended: ${video.ended}, video.readyState: ${video.readyState}, blurAmount: ${blurAmount}`);
+
       if (!isPredicting || !video.srcObject || video.paused || video.ended) {
-        console.log(`[predictWebcam] Loop stopping: isPredicting=${isPredicting}, video.srcObject=${!!video.srcObject}, video.paused=${video.paused}, video.ended=${video.ended}`);
-        isPredicting = false; // Ensure loop stops
+        isPredicting = false;
+        console.log("[predictWebcam] Loop stopping: initial check failed (not predicting, no src, paused, or ended).");
         return;
       }
 
-      // Check if MediaPipe tasks are loaded and video has enough data
       if (video.readyState < video.HAVE_ENOUGH_DATA || !imageSegmenter || !faceLandmarker) {
           console.log(`[predictWebcam] Video not ready (readyState ${video.readyState}) or models not loaded. Retrying next frame.`);
-          if (isPredicting) requestAnimationFrame(predictWebcam); // Retry on next frame
+          if (isPredicting) requestAnimationFrame(predictWebcam);
           return;
       }
-      
-      // Check if it's a new frame to process
-      if (video.currentTime === lastVideoTime && runningMode === "VIDEO") {
-          if (isPredicting) requestAnimationFrame(predictWebcam); // Skip if same frame, request next
-          return;
-      }
-      lastVideoTime = video.currentTime; // Update last processed time
 
       let startTimeMs = performance.now();
-      let segmentationCategoryMaskToClose = null; // To store the mask object for closing
+      let segmentationResultsToClose = null;
 
-      try {
-        // Perform segmentation and landmark detection
+      if (video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
+        
         const segmentationResults = imageSegmenter.segmentForVideo(video, startTimeMs);
         if (segmentationResults && segmentationResults.categoryMask) {
-            segmentationCategoryMaskToClose = segmentationResults.categoryMask; // Store for later closing
+            segmentationResultsToClose = segmentationResults.categoryMask;
         }
+        console.log("Segmentation results:", segmentationResults);
         const landmarkResults = faceLandmarker.detectForVideo(video, startTimeMs);
-        // console.log("Segmentation results:", segmentationResults); // Can be very verbose
-        // console.log("Landmark results:", landmarkResults); // Can be very verbose
+        console.log("Landmark results:", landmarkResults);
 
-        // Clear the main output canvas for the new frame
-        canvasCtx.save(); // Save current canvas state
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
-        // 1. Draw the segmented person (without background) as the base layer
         let personDrawnSuccessfully = false;
         if (segmentationResults && segmentationResults.categoryMask) {
           const fullMask = segmentationResults.categoryMask;
@@ -715,235 +550,219 @@
           const fullMaskHeight = fullMask.height;
 
           if (fullMaskPixelData && fullMaskWidth > 0 && fullMaskHeight > 0) {
-            // Ensure personMaskCanvas is the correct size for the incoming mask data
             if (personMaskCanvas.width !== fullMaskWidth || personMaskCanvas.height !== fullMaskHeight) {
               personMaskCanvas.width = fullMaskWidth;
               personMaskCanvas.height = fullMaskHeight;
             }
             drawMaskFromPixelData(fullMaskPixelData, fullMaskWidth, fullMaskHeight, personMaskCtx, personCategoryIndices);
 
-            // Composite to get only the person from the video
             personOnlyCtx.clearRect(0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
-            personOnlyCtx.drawImage(video, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height); // Draw full video frame
-            personOnlyCtx.globalCompositeOperation = 'destination-in'; // Keep where mask is opaque
-            personOnlyCtx.drawImage(personMaskCanvas, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height); // Apply person mask
-            personOnlyCtx.globalCompositeOperation = 'source-over'; // Reset composite mode
+            personOnlyCtx.drawImage(video, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
+            personOnlyCtx.globalCompositeOperation = 'destination-in';
+            personOnlyCtx.drawImage(personMaskCanvas, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
+            personOnlyCtx.globalCompositeOperation = 'source-over';
 
-            // Draw the isolated person onto the main canvas
             canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height);
             personDrawnSuccessfully = true;
-          } else {
-            console.warn("[predictWebcam] Person segmentation mask data was invalid or dimensions were zero.");
           }
         }
 
-        // If person segmentation failed, draw the raw video as a fallback
         if (!personDrawnSuccessfully) {
-          console.warn("[predictWebcam] Person segmentation failed or no mask. Drawing raw video as base.");
+          console.warn("[predictWebcam] Person segmentation failed or no mask. Drawing raw video.");
           canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
         }
 
-        // 2. Apply skin smoothing effect if segmentation and landmarks are available
-        if (blurAmount > 0 && segmentationResults && segmentationResults.categoryMask && landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
-          const skinMaskForSmoothing = segmentationResults.categoryMask; // Re-use the same mask object
-          const skinMaskPixelData = skinMaskForSmoothing.getAsUint8Array(); // Get pixel data again (it's cheap)
+        if (segmentationResults && segmentationResults.categoryMask && landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
+          console.log("CategoryMask available for smoothing:", !!segmentationResults.categoryMask);
+          console.log("FaceLandmarks available for smoothing:", landmarkResults.faceLandmarks.length);
+          const skinMaskForSmoothing = segmentationResults.categoryMask;
+          const skinMaskPixelData = skinMaskForSmoothing.getAsUint8Array();
           const skinMaskWidth = skinMaskForSmoothing.width;
           const skinMaskHeight = skinMaskForSmoothing.height;
-          const landmarks = landmarkResults.faceLandmarks[0]; // Assuming one face
+          const landmarks = landmarkResults.faceLandmarks[0];
+          console.log(`[iOS Debug] Skin mask dimensions for smoothing: ${skinMaskWidth}x${skinMaskHeight}. Pixel data length: ${skinMaskPixelData ? skinMaskPixelData.length : 'null'}`); // Enhanced log
 
           if (skinMaskPixelData && skinMaskWidth > 0 && skinMaskHeight > 0) {
-            // a. Prepare the source video frame for blurring (on a scaled-down canvas for performance)
+            console.log("[iOS Debug] Valid skinMaskPixelData found. Proceeding with blur effect generation."); // New log
+            // Draw video un-blurred onto the smaller blurredVideoCanvas (it now acts as a source)
             blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
             blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+            // The filter application on blurredVideoCtx is removed from here.
 
-            // b. Create the skin mask (from segmentation)
-            // Ensure maskCanvas is the correct size for the incoming mask data
             if (maskCanvas.width !== skinMaskWidth || maskCanvas.height !== skinMaskHeight) {
                 maskCanvas.width = skinMaskWidth;
                 maskCanvas.height = skinMaskHeight;
             }
             drawMaskFromPixelData(skinMaskPixelData, skinMaskWidth, skinMaskHeight, maskCanvasCtx, skinCategoryIndices);
 
-            // c. Create masks for facial features to exclude from blurring (eyes, mouth, etc.)
             eyeMaskCtx.clearRect(0, 0, eyeMaskCanvas.width, eyeMaskCanvas.height);
-            eyeMaskCtx.fillStyle = 'white'; // Mask regions will be white (opaque)
-            const originalFilterEye = eyeMaskCtx.filter; // Save current filter
-            if (landmarkMaskBlurRadius > 0) eyeMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`; // Soften mask edges
+            eyeMaskCtx.fillStyle = 'white';
             
-            // Helper to draw polygons from landmark connections
-            function drawLandmarkPolygon(landmarkConnections, targetCtx, targetCanvas) { /* ... (implementation unchanged) ... */ }
-            function drawCustomLandmarkPolygonFromIndices(vertexIndices, targetCtx, targetCanvas) { /* ... (implementation unchanged) ... */ }
-            function drawTriangleOnMask(vertexIndices, targetCtx, targetCanvas) { /* ... (implementation unchanged) ... */ }
-            
-            // Draw polygons for eyes, eyebrows, lips onto eyeMaskCanvas
+            const originalFilterEye = eyeMaskCtx.filter;
+            if (landmarkMaskBlurRadius > 0) {
+                eyeMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
+            }
+
+            function drawLandmarkPolygon(landmarkConnections, targetCtx, targetCanvas) {
+              if (landmarks && landmarkConnections && landmarkConnections.length > 0) {
+                targetCtx.beginPath();
+                const firstLandmarkIndex = landmarkConnections[0].start;
+                if (landmarks[firstLandmarkIndex]) {
+                  const firstPoint = landmarks[firstLandmarkIndex];
+                  targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
+                  for (const conn of landmarkConnections) {
+                    const endLandmarkIndex = conn.end;
+                    if (landmarks[endLandmarkIndex]) {
+                      const endPoint = landmarks[endLandmarkIndex];
+                      targetCtx.lineTo(endPoint.x * targetCanvas.width, endPoint.y * targetCanvas.height);
+                    } else {
+                      console.warn(`Landmark index ${endLandmarkIndex} not found.`);
+                    }
+                  }
+                  targetCtx.closePath();
+                  targetCtx.fill();
+                } else {
+                  console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point.`);
+                }
+              }
+            }
+
+            function drawCustomLandmarkPolygonFromIndices(vertexIndices, targetCtx, targetCanvas) {
+              if (landmarks && vertexIndices && vertexIndices.length > 0) {
+                targetCtx.beginPath();
+                const firstLandmarkIndex = vertexIndices[0];
+                if (landmarks[firstLandmarkIndex]) {
+                  const firstPoint = landmarks[firstLandmarkIndex];
+                  targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
+                  for (let i = 1; i < vertexIndices.length; i++) {
+                    const landmarkIndex = vertexIndices[i];
+                    if (landmarks[landmarkIndex]) {
+                      const point = landmarks[landmarkIndex];
+                      targetCtx.lineTo(point.x * targetCanvas.width, point.y * targetCanvas.height);
+                    } else {
+                      console.warn(`Landmark index ${landmarkIndex} not found in custom list.`);
+                    }
+                  }
+                  targetCtx.closePath();
+                  targetCtx.fill();
+                } else {
+                  console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point in custom list.`);
+                }
+              }
+            }
+
+            function drawTriangleOnMask(vertexIndices, targetCtx, targetCanvas) {
+              if (landmarks && vertexIndices && vertexIndices.length === 3) {
+                const points = vertexIndices.map(index => landmarks[index]);
+                if (points.every(p => p)) {
+                  targetCtx.beginPath();
+                  targetCtx.moveTo(points[0].x * targetCanvas.width, points[0].y * targetCanvas.height);
+                  targetCtx.lineTo(points[1].x * targetCanvas.width, points[1].y * targetCanvas.height);
+                  targetCtx.lineTo(points[2].x * targetCanvas.width, points[2].y * targetCanvas.height);
+                  targetCtx.closePath();
+                  targetCtx.fill();
+                } else {
+                  console.warn(`Invalid landmark index in triangle: ${vertexIndices}`);
+                }
+              }
+            }
+
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, eyeMaskCtx, eyeMaskCanvas);
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, eyeMaskCtx, eyeMaskCanvas);
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LIPS, eyeMaskCtx, eyeMaskCanvas);
-            // Additional triangles for inner mouth and specific eyebrow areas
-            const innerMouthTriangles = [[78, 95, 88], [78, 178, 87], [95, 178, 96], [78, 88, 87], [88, 87, 178], [88, 95, 96], [96, 88, 178]];
+
+            const innerMouthTriangles = [
+              [78, 95, 88], [78, 178, 87], [95, 178, 96],
+              [78, 88, 87], [88, 87, 178], [88, 95, 96],
+              [96, 88, 178]
+            ];
             innerMouthTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
-            drawTriangleOnMask([185, 292, 61], eyeMaskCtx, eyeMaskCanvas); // Example additional triangle
-            const specificEyebrowTriangles = [[107, 55, 65], [63, 46, 52], [336, 285, 295], [293, 276, 334]];
+            drawTriangleOnMask([185, 292, 61], eyeMaskCtx, eyeMaskCanvas);
+            const specificEyebrowTriangles = [
+              [107, 55, 65], [63, 46, 52],
+              [336, 285, 295], [293, 276, 334]
+            ];
             specificEyebrowTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
-            // Additional custom polygons for eye regions
+
             const additionalEyeVertices = [7,22,23,24,25,26,27,28,29,30,33,56,110,112,130,133,144,145,153,154,155,157,158,159,160,161,163,173,190,243,246,247];
             drawCustomLandmarkPolygonFromIndices(additionalEyeVertices, eyeMaskCtx, eyeMaskCanvas);
+
             const additionalOtherEyeVertices = [249,252,253,254,255,256,257,258,259,260,263,286,339,341,359,362,373,374,380,381,382,384,385,386,387,388,390,398,414,463,466,467];
             drawCustomLandmarkPolygonFromIndices(additionalOtherEyeVertices, eyeMaskCtx, eyeMaskCanvas);
-            eyeMaskCtx.filter = originalFilterEye; // Restore filter
 
-            // d. Create mask for the face oval
+            eyeMaskCtx.filter = originalFilterEye;
+
             faceOvalMaskCtx.clearRect(0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height);
             faceOvalMaskCtx.fillStyle = 'white';
+            
             const originalFilterOval = faceOvalMaskCtx.filter;
-            if (landmarkMaskBlurRadius > 0) faceOvalMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
+            if (landmarkMaskBlurRadius > 0) {
+                faceOvalMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
+            }
             drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, faceOvalMaskCtx, faceOvalMaskCanvas);
             faceOvalMaskCtx.filter = originalFilterOval;
 
-            // e. Combine masks on effectLayerCanvas: (Skin AND FaceOval) XOR Eyes/Mouth
             effectLayerCtx.clearRect(0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-            effectLayerCtx.drawImage(maskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height); // Start with skin mask
-            effectLayerCtx.globalCompositeOperation = 'destination-in'; // Intersect with face oval
+            effectLayerCtx.drawImage(maskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
+            
+            effectLayerCtx.globalCompositeOperation = 'destination-in';
             effectLayerCtx.drawImage(faceOvalMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-            effectLayerCtx.globalCompositeOperation = 'destination-out'; // Subtract eyes/mouth features
+            
+            effectLayerCtx.globalCompositeOperation = 'destination-out';
             effectLayerCtx.drawImage(eyeMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-            effectLayerCtx.globalCompositeOperation = 'source-over'; // Reset composite mode
+            
+            effectLayerCtx.globalCompositeOperation = 'source-over';
 
-            // f. Apply blur to the video, masked by the effectLayer
             tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
-            const originalFilterTempBlur = tempBlurLayerCtx.filter; // Save current filter
-            if (blurAmount > 0.1) { // Apply blur only if significant
-                tempBlurLayerCtx.filter = `blur(${blurAmount.toFixed(1)}px)`;
+
+            // Apply blur directly on the full-resolution tempBlurLayerCtx before drawing and masking
+            const originalFilterTempBlur = tempBlurLayerCtx.filter;
+            tempBlurLayerCtx.filter = 'none'; // Explicitly reset before applying new filter
+            if (blurAmount > 0) {
+                tempBlurLayerCtx.filter = `blur(${blurAmount}px)`;
+                console.log(`[iOS Debug] Applied blur filter: ${blurAmount}px to tempBlurLayerCtx`); // New log
             } else {
-                tempBlurLayerCtx.filter = 'none';
+                console.log(`[iOS Debug] Blur amount is 0 or less, no blur filter applied to tempBlurLayerCtx`); // New log
             }
-            // Draw the (potentially scaled-up) video frame from blurredVideoCanvas to tempBlurLayerCanvas.
+
+            // Draw the (potentially scaled up) video frame from blurredVideoCanvas to tempBlurLayerCanvas.
             // The blur filter on tempBlurLayerCtx will apply to this drawing operation.
             tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
-            tempBlurLayerCtx.filter = originalFilterTempBlur; // Reset filter
 
-            // Now, mask the blurred video with the final effect mask
+            // Reset filter on tempBlurLayerCtx so it doesn't affect subsequent compositing operations
+            tempBlurLayerCtx.filter = originalFilterTempBlur; 
+
+            // Now apply the effect mask (skin mask, excluding eyes/mouth/oval)
             tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
             tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
             tempBlurLayerCtx.globalCompositeOperation = 'source-over';
 
-            // g. Draw the blurred skin layer onto the main canvas (which already has the segmented person)
             canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
 
           } else {
-            console.warn("[predictWebcam] Skin mask data for smoothing was invalid or dimensions were zero. Skipping smoothing effect for this frame.");
+            console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping smoothing effect. This is a strong indicator why blur might not be working on iOS."); // Enhanced log
           }
-        } else if (blurAmount > 0) { // Only log if blur was intended
-            console.warn("[predictWebcam] Conditions not met for smoothing (no valid segmentation mask OR no landmarks OR blurAmount is zero). Skipping smoothing effect.");
-        }
-        canvasCtx.restore(); // Restore canvas state
-
-      } catch (error) {
-        console.error("[predictWebcam] Error during prediction loop:", error);
-        // Potentially stop predictions if a severe error occurs, or try to recover.
-        // For now, just log and continue to the next frame.
-      } finally {
-        // IMPORTANT: Close the categoryMask to free up resources, especially WASM memory
-        if (segmentationCategoryMaskToClose) {
-          try {
-            segmentationCategoryMaskToClose.close();
-            // console.log("Closed categoryMask successfully."); // Optional: for debugging
-          } catch (e) {
-            console.warn("Error closing categoryMask:", e);
-          }
+        } else {
+            console.warn("[iOS Debug] No valid segmentation mask OR no landmarks found for this frame. Skipping smoothing effect."); // Enhanced log
         }
       }
       
-      // Continue the loop if still predicting
+      if(segmentationResultsToClose){
+        try {
+            segmentationResultsToClose.close();
+        } catch(e){
+            console.warn("Error closing categoryMask:", e);
+        }
+      }
+
       if (isPredicting) {
         window.requestAnimationFrame(predictWebcam);
       } else {
-        console.log("[predictWebcam END] isPredicting is false, loop will stop.");
+        console.log("[predictWebcam END] Not predicting, loop will stop.");
       }
     }
-
-    // Definitions for drawLandmarkPolygon, drawCustomLandmarkPolygonFromIndices, drawTriangleOnMask
-    // These functions are used by predictWebcam to draw feature masks.
-    // Their implementations are assumed to be correct as per the original code.
-    // Make sure `landmarks` variable is accessible (it's passed or available in scope).
-
-    function drawLandmarkPolygon(landmarkConnections, targetCtx, targetCanvas) {
-        const landmarks = landmarkResults.faceLandmarks[0]; // Assuming landmarkResults is accessible in this scope or passed
-        if (landmarks && landmarkConnections && landmarkConnections.length > 0) {
-            targetCtx.beginPath();
-            const firstLandmarkIndex = landmarkConnections[0].start;
-            if (landmarks[firstLandmarkIndex]) {
-            const firstPoint = landmarks[firstLandmarkIndex];
-            targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
-            for (const conn of landmarkConnections) {
-                const endLandmarkIndex = conn.end;
-                if (landmarks[endLandmarkIndex]) {
-                const endPoint = landmarks[endLandmarkIndex];
-                targetCtx.lineTo(endPoint.x * targetCanvas.width, endPoint.y * targetCanvas.height);
-                } else {
-                // console.warn(`Landmark index ${endLandmarkIndex} not found.`); // Can be too verbose
-                }
-            }
-            targetCtx.closePath();
-            targetCtx.fill();
-            } else {
-            // console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point.`); // Can be too verbose
-            }
-        }
-    }
-
-    function drawCustomLandmarkPolygonFromIndices(vertexIndices, targetCtx, targetCanvas) {
-        const landmarks = landmarkResults.faceLandmarks[0]; // Assuming landmarkResults is accessible
-        if (landmarks && vertexIndices && vertexIndices.length > 0) {
-            targetCtx.beginPath();
-            const firstLandmarkIndex = vertexIndices[0];
-            if (landmarks[firstLandmarkIndex]) {
-            const firstPoint = landmarks[firstLandmarkIndex];
-            targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
-            for (let i = 1; i < vertexIndices.length; i++) {
-                const landmarkIndex = vertexIndices[i];
-                if (landmarks[landmarkIndex]) {
-                const point = landmarks[landmarkIndex];
-                targetCtx.lineTo(point.x * targetCanvas.width, point.y * targetCanvas.height);
-                } else {
-                // console.warn(`Landmark index ${landmarkIndex} not found in custom list.`); // Can be too verbose
-                }
-            }
-            targetCtx.closePath();
-            targetCtx.fill();
-            } else {
-            // console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point in custom list.`); // Can be too verbose
-            }
-        }
-    }
-
-    function drawTriangleOnMask(vertexIndices, targetCtx, targetCanvas) {
-        const landmarks = landmarkResults.faceLandmarks[0]; // Assuming landmarkResults is accessible
-        if (landmarks && vertexIndices && vertexIndices.length === 3) {
-            const points = vertexIndices.map(index => landmarks[index]);
-            if (points.every(p => p)) {
-            targetCtx.beginPath();
-            targetCtx.moveTo(points[0].x * targetCanvas.width, points[0].y * targetCanvas.height);
-            targetCtx.lineTo(points[1].x * targetCanvas.width, points[1].y * targetCanvas.height);
-            targetCtx.lineTo(points[2].x * targetCanvas.width, points[2].y * targetCanvas.height);
-            targetCtx.closePath();
-            targetCtx.fill();
-            } else {
-            // console.warn(`Invalid landmark index in triangle: ${vertexIndices}`); // Can be too verbose
-            }
-        }
-    }
-    // Global reference to landmarkResults so helper functions can access it.
-    // This is a bit of a shortcut; ideally, landmarks would be passed directly.
-    // For this refinement, keeping it simple.
-    let landmarkResults; // Will be updated in predictWebcam
-
-    // Initial call to create tasks (can be deferred to first webcam enable if preferred)
-    // createMediaPipeTasks(); // Optionally, load models immediately on page load.
-    // Or, let enableCam handle the first load. This is generally better to avoid loading if not used.
-
   </script>
 </body>
 </html>
