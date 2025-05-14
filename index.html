@@ -124,12 +124,6 @@
 </style>
 </head>
 <body>
-  <svg style="position:absolute; width:0; height:0; visibility:hidden;">
-    <filter id="sharpenFilter">
-      <feConvolveMatrix id="feConvMatrix" order="3 3" kernelMatrix="0 0 0 0 1 0 0 0 0" preserveAlpha="true"/>
-    </filter>
-  </svg>
-
   <div id="liveViewContainer">
     <video id="webcam" autoplay playsinline></video>
     <canvas id="output_canvas" width="640" height="480"></canvas>
@@ -156,14 +150,12 @@
     const webcamButton = document.getElementById("webcamButton");
     const loadingMessage = document.getElementById("loadingMessage");
     const takePhotoButton = document.getElementById("takePhotoButton");
-    const sharpenSlider = document.getElementById("sharpenSlider"); // Changed from blurSlider
-    const feConvMatrixElement = document.getElementById("feConvMatrix"); // Get feConvolveMatrix element
+    const sharpenSlider = document.getElementById("sharpenSlider"); 
 
     const blurScaleFactor = 0.5; 
     const landmarkMaskScaleFactor = 0.5; 
     const landmarkMaskBlurRadius = 3; 
 
-    // Initial sharpenLevel set by the slider's default value
     let sharpenLevel = parseFloat(sharpenSlider.value);
 
     const blurredVideoCanvas = document.createElement("canvas");
@@ -181,6 +173,9 @@
 
     let tempBlurLayerCanvas;
     let tempBlurLayerCtx; // Will be initialized with willReadFrequently in enableCam
+
+    let sharpenedSmallCanvas; // Added for JS sharpen
+    let sharpenedSmallCtx;    // Added for JS sharpen
 
     const personMaskCanvas = document.createElement("canvas");
     const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
@@ -351,6 +346,14 @@
             tempBlurLayerCanvas.width = video.videoWidth;
             tempBlurLayerCanvas.height = video.videoHeight;
 
+            // Initialize sharpenedSmallCanvas
+            if (!sharpenedSmallCanvas) {
+                sharpenedSmallCanvas = document.createElement('canvas');
+                sharpenedSmallCtx = sharpenedSmallCanvas.getContext('2d'); // willReadFrequently not strictly needed if only doing putImageData
+            }
+            sharpenedSmallCanvas.width = blurredVideoCanvas.width; // Same small dimensions as blurredVideoCanvas
+            sharpenedSmallCanvas.height = blurredVideoCanvas.height;
+
             loadingMessage.style.display = 'none';
             webcamButton.textContent = "DISABLE WEBCAM";
             webcamButton.disabled = false;
@@ -388,22 +391,10 @@
     webcamButton.addEventListener("click", enableCam);
     takePhotoButton.addEventListener("click", handleTakePhotoClick);
 
-    sharpenSlider.addEventListener("input", (event) => { // Changed from blurSlider
+    sharpenSlider.addEventListener("input", (event) => { 
       sharpenLevel = parseFloat(event.target.value); // sharpenLevel is 0 to 1
-      const S = sharpenLevel;
-      // Kernel for sharpen: 0 -S 0, -S 1+4S -S, 0 -S 0
-      const kernel = `0 ${-S} 0 ${-S} ${1 + 4 * S} ${-S} 0 ${-S} 0`;
-      feConvMatrixElement.setAttribute('kernelMatrix', kernel);
-      console.log(`Sharpen slider changed. sharpenLevel: ${sharpenLevel}, Kernel: ${kernel}`);
+      console.log(`Sharpen slider changed. sharpenLevel: ${sharpenLevel}`);
     });
-
-    // Initialize kernelMatrix on load based on initial slider value
-    (function initializeSharpenFilter(){
-        const initialS = sharpenLevel;
-        const initialKernel = `0 ${-initialS} 0 ${-initialS} ${1 + 4 * initialS} ${-initialS} 0 ${-initialS} 0`;
-        feConvMatrixElement.setAttribute('kernelMatrix', initialKernel);
-        console.log(`Initial sharpenLevel: ${initialS}, Initial Kernel: ${initialKernel}`);
-    })();
 
     async function dataURLtoBlob(dataurl) {
       const res = await fetch(dataurl);
@@ -540,6 +531,66 @@
         }
       }
       targetCtx.putImageData(newImageData, 0, 0);
+    }
+
+    function applySharpenEffectJS(sourceCtx, sharpenAmount) {
+      const width = sourceCtx.canvas.width;
+      const height = sourceCtx.canvas.height;
+      const S = sharpenAmount;
+
+      // Get original pixel data from the source context
+      const srcData = sourceCtx.getImageData(0, 0, width, height);
+      
+      if (S === 0) {
+        // If no sharpening, return the original image data to be drawn directly
+        return srcData;
+      }
+
+      const srcPixels = srcData.data;
+      // Create a new ImageData object for the destination (sharpened) pixels
+      // It's important to use createImageData from a context, or construct it carefully
+      const dstImageData = sourceCtx.createImageData(width, height); 
+      const dstPixels = dstImageData.data;
+
+      // Kernel for sharpen: 0 -S 0, -S 1+4S -S, 0 -S 0
+      const kernel = [
+          [0, -S, 0],
+          [-S, 1 + 4 * S, -S],
+          [0, -S, 0]
+      ];
+
+      for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+              let r = 0, g = 0, b = 0;
+              const baseOutputIndex = (y * width + x) * 4;
+
+              for (let ky = -1; ky <= 1; ky++) {
+                  for (let kx = -1; kx <= 1; kx++) {
+                      const currentKernelVal = kernel[ky + 1][kx + 1];
+                      if (currentKernelVal === 0) continue; 
+
+                      const pixelY = y + ky;
+                      const pixelX = x + kx;
+
+                      // Clamp coordinates to be within bounds (edge handling)
+                      const clampedY = Math.max(0, Math.min(height - 1, pixelY));
+                      const clampedX = Math.max(0, Math.min(width - 1, pixelX));
+                      
+                      const srcOffset = (clampedY * width + clampedX) * 4;
+                      
+                      r += srcPixels[srcOffset] * currentKernelVal;
+                      g += srcPixels[srcOffset + 1] * currentKernelVal;
+                      b += srcPixels[srcOffset + 2] * currentKernelVal;
+                  }
+              }
+
+              dstPixels[baseOutputIndex] = Math.max(0, Math.min(255, r));
+              dstPixels[baseOutputIndex + 1] = Math.max(0, Math.min(255, g));
+              dstPixels[baseOutputIndex + 2] = Math.max(0, Math.min(255, b));
+              dstPixels[baseOutputIndex + 3] = srcPixels[baseOutputIndex + 3]; // Preserve alpha
+          }
+      }
+      return dstImageData;
     }
 
     let lastVideoTime = -1;
@@ -749,22 +800,27 @@
             effectLayerCtx.globalCompositeOperation = 'source-over';
 
             tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+            tempBlurLayerCtx.filter = 'none'; // Ensure no CSS/SVG filters are active
 
-            // Apply sharpen filter directly on the full-resolution tempBlurLayerCtx before drawing and masking
-            const originalFilterTempBlur = tempBlurLayerCtx.filter;
-            tempBlurLayerCtx.filter = 'none'; // Explicitly reset before applying new filter
-            if (sharpenLevel > 0) { // Check sharpenLevel instead of blurAmount
-                tempBlurLayerCtx.filter = 'url(#sharpenFilter)'; // Apply SVG sharpen filter
-                console.log(`[Effect Debug] Applied sharpen filter. Level: ${sharpenLevel}`); 
+            // Draw current video frame to the small blurredVideoCanvas
+            blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+            blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+
+            if (sharpenLevel > 0) {
+                const sharpenedImageData = applySharpenEffectJS(blurredVideoCtx, sharpenLevel);
+                // Put the sharpened data onto the small intermediate canvas
+                sharpenedSmallCtx.putImageData(sharpenedImageData, 0, 0);
+                // Draw the small sharpened canvas onto the full-size tempBlurLayerCanvas, scaling it up
+                tempBlurLayerCtx.drawImage(sharpenedSmallCanvas, 0, 0, sharpenedSmallCanvas.width, sharpenedSmallCanvas.height, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+                console.log(`[Effect Debug] Applied JS Sharpen. Level: ${sharpenLevel}`);
             } else {
-                console.log(`[Effect Debug] Sharpen level is 0 or less, no sharpen filter applied to tempBlurLayerCtx`); 
+                // If sharpenLevel is 0, draw the original (scaled-down) video frame to tempBlurLayerCanvas, scaling it up
+                tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+                console.log(`[Effect Debug] Sharpen level is 0, drawing unsharpened scaled video.`);
             }
-
-            // Draw the (potentially scaled up) video frame from blurredVideoCanvas to tempBlurLayerCanvas.
-            tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
-
-            // Reset filter on tempBlurLayerCtx so it doesn't affect subsequent compositing operations
-            tempBlurLayerCtx.filter = originalFilterTempBlur; 
+            
+            // The old filter logic (SVG, CSS blur test) is removed.
+            // The tempBlurLayerCanvas now contains the (potentially JS-sharpened) video frame.
 
             // Now apply the effect mask (skin mask, excluding eyes/mouth/oval)
             tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
