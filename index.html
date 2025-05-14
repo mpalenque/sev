@@ -555,15 +555,10 @@
           console.log(`Skin mask dimensions for smoothing: ${skinMaskWidth}x${skinMaskHeight}. Pixel data length: ${skinMaskPixelData ? skinMaskPixelData.length : 'null'}`);
 
           if (skinMaskPixelData && skinMaskWidth > 0 && skinMaskHeight > 0) {
+            // Draw video un-blurred onto the smaller blurredVideoCanvas (it now acts as a source)
             blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
-            const originalFilterBlurredVideo = blurredVideoCtx.filter;
-            if (blurAmount > 0) {
-                blurredVideoCtx.filter = `blur(${blurAmount}px)`;
-            } else {
-                blurredVideoCtx.filter = 'none';
-            }
             blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
-            blurredVideoCtx.filter = originalFilterBlurredVideo;
+            // The filter application on blurredVideoCtx is removed from here.
 
             if (maskCanvas.width !== skinMaskWidth || maskCanvas.height !== skinMaskHeight) {
                 maskCanvas.width = skinMaskWidth;
@@ -693,12 +688,27 @@
 
             tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
 
+            // Apply blur directly on the full-resolution tempBlurLayerCtx before drawing and masking
+            const originalFilterTempBlur = tempBlurLayerCtx.filter;
+            if (blurAmount > 0) {
+                tempBlurLayerCtx.filter = `blur(${blurAmount}px)`;
+            } else {
+                tempBlurLayerCtx.filter = 'none';
+            }
+
+            // Draw the (potentially scaled up) video frame from blurredVideoCanvas to tempBlurLayerCanvas.
+            // The blur filter on tempBlurLayerCtx will apply to this drawing operation.
             tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+
+            // Reset filter on tempBlurLayerCtx so it doesn't affect subsequent compositing operations
+            tempBlurLayerCtx.filter = originalFilterTempBlur; 
+
+            // Now apply the effect mask (skin mask, excluding eyes/mouth/oval)
             tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
             tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
             tempBlurLayerCtx.globalCompositeOperation = 'source-over';
 
-            canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0);
+            canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
 
           } else {
             console.warn("[predictWebcam] Skin mask data for smoothing was invalid or dimensions were zero. Skipping smoothing effect.");
