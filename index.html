@@ -10,42 +10,47 @@
 
   body {
     font-family: Arial, sans-serif;
-    margin: 0; /* Changed from 20px */
-    padding: 20px; /* Added for content spacing */
-    box-sizing: border-box; /* Added for better sizing control */
-    min-height: 100%; /* Ensure body takes full viewport height */
+    margin: 0;
+    padding: 0; /* MODIFIED: Remove padding from body for fullscreen effect */
+    box-sizing: border-box;
+    height: 100vh; /* MODIFIED: Use viewport height */
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: space-between; /* MODIFIED: Pushes controls to bottom */
     background-color: #131313;
     background-image: url('sevBG.png');
     background-size: cover;
     background-repeat: no-repeat;
-    background-position: right center; /* MODIFIED: Align right edge of image with right edge of container */
-    overflow: hidden; /* Prevent all scrolling on the body */
+    background-position: right center;
+    overflow: hidden;
   }
   #liveViewContainer {
     position: relative;
-    border: 2px solid #a48353; /* ADDED: New border for webcam view */
+    /* border: 2px solid #a48353; */ /* MODIFIED: Removed border */
     background-color: transparent;
-    padding: 10px;
-    border-radius: 8px;
-    width: 90%; /* Added for responsiveness */
-    max-width: 700px; /* Added for a sensible max content width */
-    display: flex; /* Added to help center canvas */
-    justify-content: center; /* Added to center canvas */
-    align-items: center; /* Added to center canvas */
+    /* padding: 10px; */ /* MODIFIED: Remove padding or adjust as needed */
+    border-radius: 8px; /* This might be visually lost without a border/padding */
+    width: 100%; /* MODIFIED: Take full width */
+    flex-grow: 1; /* MODIFIED: Allow this container to take up available vertical space */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* MODIFIED: Ensure canvas doesn't overflow its container */
+    margin-top: 10px; /* Optional: Add some space at the top */
   }
   video {
     display: none; /* Hide video element, we'll draw to canvas */
   }
   canvas#output_canvas { /* Selector made more specific */
     display: block;
-    max-width: 100%; /* Added to ensure it scales down to fit container */
-    height: auto;    /* Added to maintain aspect ratio when scaling */
+    max-width: 100%;
+    max-height: 100%; /* MODIFIED: Ensure canvas fits within the new larger container */
+    height: auto;
+    object-fit: contain; /* MODIFIED: Ensure aspect ratio is maintained and fits */
   }
   .controls {
-    margin-top: 15px;
+    margin-top: 0; /* MODIFIED: Remove top margin, rely on flexbox for spacing */
     padding: 15px;
     background-color: transparent; /* MODIFIED: Made transparent */
     border-radius: 8px;
@@ -479,8 +484,8 @@
         
         const shareData = {
           files: [file],
-          title: "My SEV Look", // Changed title for clarity
-          text: "You just tried on #The15MinFace by SEV :sparkles:\nOur signature laser facial. Low effort. High glow.", // MODIFIED: Updated share text
+          title: "My SEV Look",
+          text: "You just tried on #The15MinFace by SEV ✨\nOur signature laser facial. Low effort. High glow.", // MODIFIED: Ensured sparkle emoji is ✨
         };
 
         if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
