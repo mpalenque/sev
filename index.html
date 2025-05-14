@@ -831,27 +831,15 @@
                 console.log(`[Effect Debug] Sharpen level is 0, drawing unsharpened scaled video.`);
             }
             
-            // ===== START DIAGNOSTIC: Show full sharpened/downscaled frame directly on output canvas =====
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Clear main canvas
-            if (sharpenLevel > 0) {
-                canvasCtx.drawImage(sharpenedSmallCanvas, 0, 0, sharpenedSmallCanvas.width, sharpenedSmallCanvas.height, 0, 0, canvasElement.width, canvasElement.height);
-                console.log("[Diagnostic] Drawing ONLY full sharpenedSmallCanvas to output.");
-            } else {
-                // If sharpenLevel is 0, draw the original (scaled-down then up) video frame
-                canvasCtx.drawImage(blurredVideoCanvas, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height, 0, 0, canvasElement.width, canvasElement.height);
-                console.log("[Diagnostic] Drawing ONLY full blurredVideoCanvas (downscaled original) to output.");
-            }
-            // ===== END DIAGNOSTIC =====
-            
-            // The original masking and drawing of tempBlurLayerCanvas is now bypassed by the diagnostic block above.
-            /*
+            // Restore original masking and drawing logic
             // Now apply the effect mask (skin mask, excluding eyes/mouth/oval)
             tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
             tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
             tempBlurLayerCtx.globalCompositeOperation = 'source-over';
 
+            // Draw the tempBlurLayerCanvas (which now contains only the processed skin)
+            // onto the main canvas. This will be drawn over the personOnlyCanvas if it was drawn.
             canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
-            */
 
           } else {
             console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping custom effect. This is a strong indicator why effect might not be working on iOS."); 
