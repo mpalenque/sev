@@ -17,18 +17,18 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #131313; 
+    background-color: #131313;
     background-image: url('sevBG.png');
-    background-size: cover; 
-    background-repeat: no-repeat; 
-    background-position: center center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: 10% center; /* MODIFIED: Shifted 40% left from center */
     overflow: hidden; /* Prevent all scrolling on the body */
   }
   #liveViewContainer {
     position: relative;
-    border: 1px solid #2b2b2b; 
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    background-color: transparent; 
+    /* border: 1px solid #2b2b2b; */ /* MODIFIED: Removed border */
+    /* box-shadow: 0 4px 8px rgba(0,0,0,0.1); */ /* MODIFIED: Optionally remove shadow if it looks like a frame */
+    background-color: transparent;
     padding: 10px;
     border-radius: 8px;
     width: 90%; /* Added for responsiveness */
@@ -42,16 +42,17 @@
   }
   canvas#output_canvas { /* Selector made more specific */
     display: block;
-    border: 1px solid #2b2b2b; 
+    /* border: 1px solid #2b2b2b; */ /* MODIFIED: Removed border */
     max-width: 100%; /* Added to ensure it scales down to fit container */
     height: auto;    /* Added to maintain aspect ratio when scaling */
   }
   .controls {
     margin-top: 15px;
     padding: 15px;
-    background-color: #1f1f1f; 
+    /* background-color: #1f1f1f; */ /* MODIFIED: Made transparent */
+    background-color: transparent; /* MODIFIED: Made transparent */
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); */ /* MODIFIED: Removed shadow */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -133,8 +134,8 @@
   <div class="controls">
     <button id="webcamButton">ENABLE WEBCAM</button>
     <button id="takePhotoButton" style="margin-top: 10px;">TAKE PHOTO</button>
-    <label for="sharpenSlider">Sharpen Level:</label>
-    <input type="range" id="sharpenSlider" min="0" max="1" step="0.01" value="0.2">
+    <label for="sharpenSlider" style="display: none;">Sharpen Level:</label> <!-- MODIFIED: Hidden -->
+    <input type="range" id="sharpenSlider" min="0" max="1" step="0.01" value="0.2" style="display: none;"> <!-- MODIFIED: Hidden -->
   </div>
 
   <script type="module">
