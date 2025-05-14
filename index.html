@@ -4,42 +4,59 @@
 <meta charset="utf-8">
 <title>Skin Smoothing with MediaPipe ImageSegmenter</title>
 <style>
+  html { /* New rule */
+    height: 100%;
+  }
+
   body {
     font-family: Arial, sans-serif;
-    margin: 20px;
+    margin: 0; /* Changed from 20px */
+    padding: 20px; /* Added for content spacing */
+    box-sizing: border-box; /* Added for better sizing control */
+    min-height: 100%; /* Ensure body takes full viewport height */
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #131313; /* Updated */
-    background-image: url('sev.png');
-    background-size: cover; /* Optional: to make the image cover the entire background */
-    background-repeat: no-repeat; /* Optional: to prevent the image from repeating */
-    background-position: center center; /* Optional: to center the image */
+    background-color: #131313; 
+    background-image: url('sevBG.png');
+    background-size: cover; 
+    background-repeat: no-repeat; 
+    background-position: center center;
+    overflow-x: hidden; /* Added to prevent horizontal scroll on small overflows */
   }
   #liveViewContainer {
     position: relative;
-    border: 1px solid #2b2b2b; /* Updated */
+    border: 1px solid #2b2b2b; 
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    background-color: transparent; /* Ensure this is transparent */
+    background-color: transparent; 
     padding: 10px;
     border-radius: 8px;
+    width: 90%; /* Added for responsiveness */
+    max-width: 700px; /* Added for a sensible max content width */
+    display: flex; /* Added to help center canvas */
+    justify-content: center; /* Added to center canvas */
+    align-items: center; /* Added to center canvas */
   }
   video {
     display: none; /* Hide video element, we'll draw to canvas */
   }
-  canvas {
+  canvas#output_canvas { /* Selector made more specific */
     display: block;
-    border: 1px solid #2b2b2b; /* Updated */
+    border: 1px solid #2b2b2b; 
+    max-width: 100%; /* Added to ensure it scales down to fit container */
+    height: auto;    /* Added to maintain aspect ratio when scaling */
   }
   .controls {
     margin-top: 15px;
     padding: 15px;
-    background-color: #1f1f1f; /* Updated */
+    background-color: #1f1f1f; 
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 90%; /* Added for responsiveness */
+    max-width: 700px; /* Added for a sensible max content width */
   }
   .controls button {
     padding: 10px 15px;
@@ -377,7 +394,7 @@
 
         const dataUrl = await new Promise((resolve, reject) => {
           const backgroundImage = new Image();
-          backgroundImage.src = 'sev.png';
+          backgroundImage.src = 'sevBG.png';
 
           backgroundImage.onload = () => {
             const cw = photoCanvas.width;
@@ -410,7 +427,7 @@
           };
 
           backgroundImage.onerror = (err) => {
-            console.error("Error loading background image 'sev.png'. Proceeding without custom background.", err);
+            console.error("Error loading background image 'sevBG.png'. Proceeding without custom background.", err);
             photoCtx.drawImage(canvasElement, 0, 0, photoCanvas.width, photoCanvas.height);
             resolve(photoCanvas.toDataURL("image/png"));
           };
