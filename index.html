@@ -537,18 +537,17 @@
       const width = sourceCtx.canvas.width;
       const height = sourceCtx.canvas.height;
       const S = sharpenAmount;
+      console.log(`[JS Sharpen] applySharpenEffectJS called. Width: ${width}, Height: ${height}, SharpenAmount (S): ${S}`);
 
-      // Get original pixel data from the source context
       const srcData = sourceCtx.getImageData(0, 0, width, height);
-      
+      console.log(`[JS Sharpen] Got source ImageData. Length: ${srcData.data.length}`);
+
       if (S === 0) {
-        // If no sharpening, return the original image data to be drawn directly
+        console.log("[JS Sharpen] S is 0, returning original data.");
         return srcData;
       }
 
       const srcPixels = srcData.data;
-      // Create a new ImageData object for the destination (sharpened) pixels
-      // It's important to use createImageData from a context, or construct it carefully
       const dstImageData = sourceCtx.createImageData(width, height); 
       const dstPixels = dstImageData.data;
 
@@ -558,6 +557,14 @@
           [-S, 1 + 4 * S, -S],
           [0, -S, 0]
       ];
+
+      const sampleX = Math.floor(width / 2);
+      const sampleY = Math.floor(height / 2);
+      const sampleIndex = (sampleY * width + sampleX) * 4;
+
+      if (srcPixels.length > sampleIndex + 3) {
+        console.log(`[JS Sharpen] Before - Sample pixel at [${sampleX},${sampleY}] (R,G,B,A): ${srcPixels[sampleIndex]}, ${srcPixels[sampleIndex+1]}, ${srcPixels[sampleIndex+2]}, ${srcPixels[sampleIndex+3]}`);
+      }
 
       for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
@@ -590,6 +597,11 @@
               dstPixels[baseOutputIndex + 3] = srcPixels[baseOutputIndex + 3]; // Preserve alpha
           }
       }
+
+      if (dstPixels.length > sampleIndex + 3) {
+        console.log(`[JS Sharpen] After - Sample pixel at [${sampleX},${sampleY}] (R,G,B,A): ${dstPixels[sampleIndex]}, ${dstPixels[sampleIndex+1]}, ${dstPixels[sampleIndex+2]}, ${dstPixels[sampleIndex+3]}`);
+      }
+      console.log("[JS Sharpen] Convolution finished, returning destination ImageData.");
       return dstImageData;
     }
 
