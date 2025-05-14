@@ -121,28 +121,28 @@
     let blurAmount = 0.8;
 
     const blurredVideoCanvas = document.createElement("canvas");
-    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true });
+    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
     const maskCanvas = document.createElement("canvas");
-    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true });
+    const maskCanvasCtx = maskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
     const effectLayerCanvas = document.createElement("canvas");
-    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true });
+    const effectLayerCtx = effectLayerCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
 
     const eyeMaskCanvas = document.createElement("canvas");
-    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true });
+    const eyeMaskCtx = eyeMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
 
     const faceOvalMaskCanvas = document.createElement("canvas");
-    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true });
+    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
 
     let tempBlurLayerCanvas;
-    let tempBlurLayerCtx;
+    let tempBlurLayerCtx; // Will be initialized with willReadFrequently in enableCam
 
     const personMaskCanvas = document.createElement("canvas");
-    const personMaskCtx = personMaskCanvas.getContext("2d");
+    const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
     const personOnlyCanvas = document.createElement("canvas");
-    const personOnlyCtx = personOnlyCanvas.getContext("2d");
+    const personOnlyCtx = personOnlyCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
 
     const skinCategoryIndices = [3];
-    const personCategoryIndices = [1, 2, 3, 4];
+    const personCategoryIndices = [1, 2, 3];
 
     async function createMediaPipeTasks() {
       loadingMessage.textContent = 'Initializing MediaPipe tasks...';
@@ -300,7 +300,7 @@
 
             if (!tempBlurLayerCanvas) {
                 tempBlurLayerCanvas = document.createElement('canvas');
-                tempBlurLayerCtx = tempBlurLayerCanvas.getContext('2d');
+                tempBlurLayerCtx = tempBlurLayerCanvas.getContext('2d', {willReadFrequently: true, alpha: true});
             }
             tempBlurLayerCanvas.width = video.videoWidth;
             tempBlurLayerCanvas.height = video.videoHeight;
