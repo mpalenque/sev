@@ -59,6 +59,7 @@
     align-items: center;
     width: 90%; /* Added for responsiveness */
     max-width: 700px; /* Added for a sensible max content width */
+    margin-bottom: 10vh; /* MODIFIED: Move up by 10% of viewport height */
   }
   .controls button {
     padding: 10px 15px;
@@ -166,6 +167,9 @@
 
     let sharpenedSmallCanvas; // Added for JS sharpen
     let sharpenedSmallCtx;    // Added for JS sharpen
+
+    let processedPersonCanvas; // ADDED: For drawing person with effects before background removal
+    let processedPersonCtx;    // ADDED: Context for processedPersonCanvas
 
     const personMaskCanvas = document.createElement("canvas");
     const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
@@ -355,6 +359,14 @@
             }
             sharpenedSmallCanvas.width = blurredVideoCanvas.width; // Same small dimensions as blurredVideoCanvas
             sharpenedSmallCanvas.height = blurredVideoCanvas.height;
+
+            // Initialize processedPersonCanvas (ADDED)
+            if (!processedPersonCanvas) {
+                processedPersonCanvas = document.createElement('canvas');
+                processedPersonCtx = processedPersonCanvas.getContext('2d', {willReadFrequently: true, alpha: true}); // alpha:true is important
+            }
+            processedPersonCanvas.width = video.videoWidth;
+            processedPersonCanvas.height = video.videoHeight;
 
             loadingMessage.style.display = 'none';
             webcamButton.textContent = "DISABLE WEBCAM";
@@ -624,46 +636,75 @@
         const landmarkResults = faceLandmarker.detectForVideo(video, startTimeMs);
         console.log("Landmark results:", landmarkResults);
 
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        // --- MODIFIED DRAWING LOGIC WITH BACKGROUND SUBTRACTION ---
 
-        // --- MODIFIED DRAWING LOGIC ---
+        // 0. Clear the processedPersonCanvas
+        processedPersonCtx.clearRect(0, 0, processedPersonCanvas.width, processedPersonCanvas.height);
 
-        // 1. Draw the fully sharpened video as the base layer
-        // 1a. Draw current video to a small canvas for sharpening
+        // 1. Draw the fully sharpened video as the base layer ONTO processedPersonCtx
+        // 1a. Draw current video to a small canvas for sharpening (blurredVideoCanvas)
         blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
         blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
 
-        // 1b. Apply maximum sharpening (sharpenLevel is fixed at 1.0)
+        // 1b. Apply maximum sharpening
         const sharpenedImageData = applySharpenEffectJS(blurredVideoCtx, forcedSharpenLevel);
         sharpenedSmallCtx.putImageData(sharpenedImageData, 0, 0);
 
-        // 1c. Draw the small sharpened image scaled up to the main canvas
-        canvasCtx.drawImage(sharpenedSmallCanvas, 0, 0, sharpenedSmallCanvas.width, sharpenedSmallCanvas.height, 0, 0, canvasElement.width, canvasElement.height);
+        // 1c. Draw the small sharpened image scaled up to the processedPersonCtx
+        processedPersonCtx.drawImage(sharpenedSmallCanvas, 0, 0, sharpenedSmallCanvas.width, sharpenedSmallCanvas.height, 0, 0, processedPersonCanvas.width, processedPersonCanvas.height);
 
-        // 2. If face landmarks are available, draw the original (unsharpened) face oval on top
+        // 2. If face landmarks are available, draw the original (unsharpened) face oval ONTO processedPersonCtx
         if (landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
           const landmarks = landmarkResults.faceLandmarks[0];
 
-          // 2a. Update faceOvalMaskCanvas
+          // 2a. Update faceOvalMaskCanvas (small scale)
           faceOvalMaskCtx.clearRect(0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height);
           faceOvalMaskCtx.fillStyle = 'white';
-          // Call the global helper function to draw the face oval
           drawLandmarkPolygonGlobal(landmarks, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, faceOvalMaskCtx, faceOvalMaskCanvas);
 
-          // 2b. Use tempBlurLayerCanvas to prepare the unsharpened face oval
+          // 2b. Use tempBlurLayerCanvas to prepare the unsharpened face oval (full scale)
           tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
-          
-          // 2c. Draw the original video onto tempBlurLayerCanvas
-          tempBlurLayerCtx.drawImage(video, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
-          
-          // 2d. Mask this with the faceOvalMaskCanvas (scaled)
+          tempBlurLayerCtx.drawImage(video, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height); // Original video
+
+          // 2c. Mask this with the faceOvalMaskCanvas (scaled to full)
           tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
           tempBlurLayerCtx.drawImage(faceOvalMaskCanvas, 0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
           tempBlurLayerCtx.globalCompositeOperation = 'source-over';
 
-          // 2e. Draw the unsharpened face oval (from tempBlurLayerCanvas) onto the main canvas
-          canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
+          // 2d. Draw the unsharpened face oval (from tempBlurLayerCanvas) onto processedPersonCtx
+          processedPersonCtx.drawImage(tempBlurLayerCanvas, 0, 0, processedPersonCanvas.width, processedPersonCanvas.height);
         }
+
+        // 3. Apply background subtraction using the segmentation mask
+        if (segmentationResults && segmentationResults.categoryMask) {
+            const mask = segmentationResults.categoryMask;
+            const personImageData = processedPersonCtx.getImageData(0, 0, processedPersonCanvas.width, processedPersonCanvas.height);
+            const data = personImageData.data;
+            
+            // Assuming mask.getAsUint8Array() gives category indices per pixel
+            // and mask dimensions match processedPersonCanvas dimensions.
+            const maskArray = mask.getAsUint8Array(); 
+            const maskWidth = mask.width;
+            const maskHeight = mask.height;
+
+            if (maskWidth !== processedPersonCanvas.width || maskHeight !== processedPersonCanvas.height) {
+                console.warn(`Mask dimensions (${maskWidth}x${maskHeight}) do not match person canvas dimensions (${processedPersonCanvas.width}x${processedPersonCanvas.height}). Background subtraction might be inaccurate.`);
+                // Fallback or error handling might be needed here if dimensions mismatch.
+                // For now, we proceed assuming they match or the browser handles scaling in putImageData if mask is used directly.
+            }
+
+            for (let i = 0; i < maskArray.length; i++) {
+                const category = maskArray[i];
+                if (category === 0) { // Category 0 is typically background
+                    data[i * 4 + 3] = 0; // Set alpha to 0 for background pixels
+                }
+            }
+            processedPersonCtx.putImageData(personImageData, 0, 0);
+        }
+        
+        // 4. Clear the main canvas and draw the processedPersonCanvas (with transparent background) to it
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(processedPersonCanvas, 0, 0, canvasElement.width, canvasElement.height);
         
         // --- END OF MODIFIED DRAWING LOGIC ---
       }
@@ -685,3 +726,4 @@
   </script>
 </body>
 </html>
+``` 
