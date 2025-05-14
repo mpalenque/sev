@@ -106,8 +106,8 @@
     const landmarkMaskScaleFactor = 0.5; 
     const landmarkMaskBlurRadius = 3; 
     const SLIDER_POWER_CURVE = 3; 
-    const RAW_SLIDER_DEFAULT_VALUE = 20.8; // New constant for the desired default raw value
-    const SLIDER_MAX_VALUE = 20; // Original max value of the slider
+    const RAW_SLIDER_DEFAULT_VALUE = 0.8; // This constant remains but is not used for the direct blurAmount setting below.
+    const SLIDER_MAX_VALUE = 20; // This constant remains but is not used for the direct blurAmount setting below.
 
     function calculateEffectiveBlur(rawValue, sliderMax, power) {
       if (sliderMax === 0) return 0; 
@@ -115,12 +115,10 @@
       return Math.pow(normalizedValue, power) * sliderMax;
     }
 
-    // Set blurAmount using the new default raw value
-    let blurAmount = calculateEffectiveBlur(
-      RAW_SLIDER_DEFAULT_VALUE,
-      SLIDER_MAX_VALUE,
-      SLIDER_POWER_CURVE
-    );
+    // Set blurAmount directly to 0.8px as requested.
+    // The previous calculation using calculateEffectiveBlur resulted in a very small blur (0.00128px)
+    // which was likely imperceptible on iPhone.
+    let blurAmount = 0.8;
 
     const blurredVideoCanvas = document.createElement("canvas");
     const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true });
