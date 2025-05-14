@@ -26,8 +26,7 @@
   }
   #liveViewContainer {
     position: relative;
-    /* border: 1px solid #2b2b2b; */ /* MODIFIED: Removed border */
-    /* box-shadow: 0 4px 8px rgba(0,0,0,0.1); */ /* MODIFIED: Optionally remove shadow if it looks like a frame */
+    border: 2px solid #a48353; /* ADDED: New border for webcam view */
     background-color: transparent;
     padding: 10px;
     border-radius: 8px;
@@ -42,17 +41,14 @@
   }
   canvas#output_canvas { /* Selector made more specific */
     display: block;
-    /* border: 1px solid #2b2b2b; */ /* MODIFIED: Removed border */
     max-width: 100%; /* Added to ensure it scales down to fit container */
     height: auto;    /* Added to maintain aspect ratio when scaling */
   }
   .controls {
     margin-top: 15px;
     padding: 15px;
-    /* background-color: #1f1f1f; */ /* MODIFIED: Made transparent */
     background-color: transparent; /* MODIFIED: Made transparent */
     border-radius: 8px;
-    /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); */ /* MODIFIED: Removed shadow */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -96,8 +92,6 @@
     cursor: pointer;
     border-radius: 50%; /* Circular thumb */
     border: 2px solid white; /* Optional: adds a border to the thumb */
-    /* Adjust thumb position to align with a taller track if needed 
-       e.g., margin-top: -10px; if track height + padding is tall */
   }
 
   /* Styles for Firefox slider thumb */
@@ -485,8 +479,8 @@
         
         const shareData = {
           files: [file],
-          title: "My Photo",
-          text: "Check out this photo I took!",
+          title: "My SEV Look", // Changed title for clarity
+          text: "You just tried on #The15MinFace by SEV :sparkles:\nOur signature laser facial. Low effort. High glow.", // MODIFIED: Updated share text
         };
 
         if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
