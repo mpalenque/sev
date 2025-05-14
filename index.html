@@ -10,7 +10,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #f0f0f0;
+    background-color: #131313; /* Updated */
     background-image: url('sev.png');
     background-size: cover; /* Optional: to make the image cover the entire background */
     background-repeat: no-repeat; /* Optional: to prevent the image from repeating */
@@ -18,7 +18,7 @@
   }
   #liveViewContainer {
     position: relative;
-    border: 1px solid #ccc;
+    border: 1px solid #2b2b2b; /* Updated */
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     background-color: transparent; /* Ensure this is transparent */
     padding: 10px;
@@ -29,12 +29,12 @@
   }
   canvas {
     display: block;
-    border: 1px solid #ddd;
+    border: 1px solid #2b2b2b; /* Updated */
   }
   .controls {
     margin-top: 15px;
     padding: 15px;
-    background-color: #fff;
+    background-color: #1f1f1f; /* Updated */
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
@@ -47,18 +47,20 @@
     cursor: pointer;
     border: none;
     border-radius: 5px;
-    background-color: #007bff;
-    color: white;
+    background-color: #a48353; /* Updated */
+    color: #ffffff; /* Updated */
     margin-bottom: 10px;
   }
   .controls button:hover {
-    background-color: #0056b3;
+    background-color: #8c6f47; /* Darker shade of #a48353 for hover */
   }
   .controls label {
     margin-bottom: 5px;
+    color: #ffffff; /* Updated */
   }
   .controls input[type="range"] {
     width: 200px;
+    accent-color: #a48353; /* Updated */
   }
   #loadingMessage {
     position: absolute;
@@ -66,8 +68,8 @@
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 1.2em;
-    color: #333;
-    background-color: rgba(255, 255, 255, 0.8);
+    color: #131313; /* Updated */
+    background-color: rgba(255, 255, 255, 0.9); /* Updated for better readability */
     padding: 10px;
     border-radius: 5px;
     display: none; /* Hidden by default */
@@ -86,6 +88,8 @@
   <div class="controls">
     <button id="webcamButton">ENABLE WEBCAM</button>
     <button id="takePhotoButton" style="margin-top: 10px;">TAKE PHOTO</button>
+    <label for="blurSlider">Blur Amount:</label>
+    <input type="range" id="blurSlider" min="0" max="1" step="0.01" value="0.8">
   </div>
 
   <script type="module">
@@ -101,6 +105,7 @@
     const webcamButton = document.getElementById("webcamButton");
     const loadingMessage = document.getElementById("loadingMessage");
     const takePhotoButton = document.getElementById("takePhotoButton");
+    const blurSlider = document.getElementById("blurSlider");
 
     const blurScaleFactor = 0.5; 
     const landmarkMaskScaleFactor = 0.5; 
@@ -115,10 +120,8 @@
       return Math.pow(normalizedValue, power) * sliderMax;
     }
 
-    // Set blurAmount directly to 0.8px as requested.
-    // The previous calculation using calculateEffectiveBlur resulted in a very small blur (0.00128px)
-    // which was likely imperceptible on iPhone.
-    let blurAmount = 0.8;
+    // Initial blurAmount set by the slider's default value, calculated effectively
+    let blurAmount = calculateEffectiveBlur(parseFloat(blurSlider.value), 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
 
     const blurredVideoCanvas = document.createElement("canvas");
     const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
@@ -340,6 +343,16 @@
       }
     }
     webcamButton.addEventListener("click", enableCam);
+    takePhotoButton.addEventListener("click", handleTakePhotoClick);
+
+    blurSlider.addEventListener("input", (event) => {
+      const rawValue = parseFloat(event.target.value); // Slider value is 0 to 1
+      // Map the 0-1 slider range to a 0-SLIDER_MAX_VALUE effective blur range
+      // The calculateEffectiveBlur function expects a rawValue that is part of its own max (which is 1 here for the slider)
+      // and then we scale it up by SLIDER_MAX_VALUE.
+      blurAmount = calculateEffectiveBlur(rawValue, 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
+      console.log(`Blur slider changed. Raw: ${rawValue}, Calculated blurAmount: ${blurAmount}`);
+    });
 
     async function dataURLtoBlob(dataurl) {
       const res = await fetch(dataurl);
@@ -441,8 +454,6 @@
         }
       }
     }
-
-    takePhotoButton.addEventListener("click", handleTakePhotoClick);
 
     function drawMaskFromPixelData(maskPixelData, maskWidth, maskHeight, targetCtx, targetIndices) {
       if (!maskPixelData || maskPixelData.length === 0) {
