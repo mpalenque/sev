@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Skin Smoothing with MediaPipe ImageSegmenter</title>
+<style>
+  html { /* New rule */
+    height: 100%;
+  }
+
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0; /* MODIFIED: Remove padding from body for fullscreen effect */
+    box-sizing: border-box;
+    height: 100vh; /* MODIFIED: Use viewport height */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between; /* MODIFIED: Pushes controls to bottom */
+    background-color: #131313;
+    background-image: url('sevBG.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: right center;
+    overflow: hidden;
+  }
+  #liveViewContainer {
+    position: relative;
+    /* border: 2px solid #a48353; */ /* MODIFIED: Removed border */
+    background-color: transparent;
+    /* padding: 10px; */ /* MODIFIED: Remove padding or adjust as needed */
+    border-radius: 8px; /* This might be visually lost without a border/padding */
+    width: 100%; /* MODIFIED: Take full width */
+    flex-grow: 1; /* MODIFIED: Allow this container to take up available vertical space */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* MODIFIED: Ensure canvas doesn't overflow its container */
+    margin-top: 10px; /* Optional: Add some space at the top */
+  }
+  video {
+    display: none; /* Hide video element, we'll draw to canvas */
+  }
+  canvas#output_canvas { /* Selector made more specific */
+    display: block;
+    max-width: 100%;
+    max-height: 100%; /* MODIFIED: Ensure canvas fits within the new larger container */
+    height: auto;
+    object-fit: contain; /* MODIFIED: Ensure aspect ratio is maintained and fits */
+  }
+  .controls {
+    margin-top: 0; /* MODIFIED: Remove top margin, rely on flexbox for spacing */
+    padding: 15px;
+    background-color: transparent; /* MODIFIED: Made transparent */
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 90%; /* Added for responsiveness */
+    max-width: 700px; /* Added for a sensible max content width */
+  }
+  .controls button {
+    padding: 10px 15px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #a48353; /* Updated */
+    color: #ffffff; /* Updated */
+    margin-bottom: 10px;
+  }
+  .controls button:hover {
+    background-color: #8c6f47; /* Darker shade of #a48353 for hover */
+  }
+  .controls label {
+    margin-bottom: 5px;
+    color: #ffffff; /* Updated */
+  }
+  .controls input[type="range"] {
+    width: 250px; /* Increased width */
+    height: 20px; /* Increased height for the track */
+    accent-color: #a48353; 
+    margin-top: 10px; /* Added margin for better spacing */
+    margin-bottom: 10px; /* Added margin for better spacing */
+    padding: 10px 0; /* Add padding to make the touch area for the track larger vertically */
+    box-sizing: content-box; /* Ensure padding adds to height for touch purposes */
+  }
+
+  /* Styles for WebKit (Chrome, Safari, newer Edge) slider thumb */
+  .controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Important to override default styling */
+    appearance: none;
+    width: 40px; /* Further Increased thumb width */
+    height: 40px; /* Further Increased thumb height */
+    background: #a48353;
+    cursor: pointer;
+    border-radius: 50%; /* Circular thumb */
+    border: 2px solid white; /* Optional: adds a border to the thumb */
+  }
+
+  /* Styles for Firefox slider thumb */
+  .controls input[type="range"]::-moz-range-thumb {
+    width: 40px; /* Further Increased thumb width */
+    height: 40px; /* Further Increased thumb height */
+    background: #a48353;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid white; /* Optional: adds a border to the thumb */
+  }
+
+  #loadingMessage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2em;
+    color: #131313; /* Updated */
+    background-color: rgba(255, 255, 255, 0.9); /* Updated for better readability */
+    padding: 10px;
+    border-radius: 5px;
+    display: none; /* Hidden by default */
+  }
+</style>
+</head>
+<body>
+  <div id="liveViewContainer">
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output_canvas" width="640" height="480"></canvas>
+    <div id="loadingMessage">Loading model and webcam...</div>
+  </div>
+
+  <div class="controls">
+    <button id="webcamButton">ENABLE WEBCAM</button>
+    <button id="takePhotoButton" style="margin-top: 10px;">TAKE PHOTO</button>
+  </div>
+
+  <script type="module">
+    import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"; // Changed import style
+    const { ImageSegmenter, FaceLandmarker, FilesetResolver } = vision; // Destructure necessary components
+
+    let imageSegmenter;
+    let faceLandmarker;
+    let runningMode = "VIDEO";
+    const video = document.getElementById("webcam");
+    const canvasElement = document.getElementById("output_canvas");
+    const canvasCtx = canvasElement.getContext("2d", { alpha: true });
+    const webcamButton = document.getElementById("webcamButton");
+    const loadingMessage = document.getElementById("loadingMessage");
+    const takePhotoButton = document.getElementById("takePhotoButton");
+
+    const blurScaleFactor = 0.5; 
+    const landmarkMaskScaleFactor = 0.5; 
+    const landmarkMaskBlurRadius = 0;
+
+    let sharpenLevel = 1.0; // MODIFIED: Set to 1.0 for max sharpness
+
+    const blurredVideoCanvas = document.createElement("canvas");
+    const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const faceOvalMaskCanvas = document.createElement("canvas");
+    const faceOvalMaskCtx = faceOvalMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    let tempBlurLayerCanvas;
+    let tempBlurLayerCtx; // Will be initialized with willReadFrequently in enableCam
+
+    let sharpenedSmallCanvas; // Added for JS sharpen
+    let sharpenedSmallCtx;    // Added for JS sharpen
+
+    const personMaskCanvas = document.createElement("canvas");
+    const personMaskCtx = personMaskCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+    const personOnlyCanvas = document.createElement("canvas");
+    const personOnlyCtx = personOnlyCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+
+    const personCategoryIndices = [1, 2, 3, 4, 5]; // MODIFIED: Added 5 (others)
+
+    // Function to detect iOS
+    function isIOS() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    }
+
+    async function createMediaPipeTasks() {
+      loadingMessage.textContent = 'Initializing MediaPipe tasks...';
+      loadingMessage.style.display = 'block';
+      console.log("Attempting to create MediaPipe tasks...");
+      const runningOnIOS = isIOS();
+      console.log("Running on iOS:", runningOnIOS);
+
+      let visionFilesetResolver;
+      try {
+        visionFilesetResolver = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        );
+      } catch (e) {
+        console.error("Failed to load FilesetResolver for Vision Tasks:", e);
+        loadingMessage.textContent = 'Error: Could not load MediaPipe vision tasks. Check console.';
+        return;
+      }
+      console.log("FilesetResolver loaded.");
+
+      let imageSegmenterDelegate = runningOnIOS ? "CPU" : "GPU";
+      try {
+        loadingMessage.textContent = `Loading Image Segmenter model (${imageSegmenterDelegate})...`;
+        const segmenterStartTime = performance.now();
+        imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+            delegate: imageSegmenterDelegate
+          },
+          runningMode: runningMode,
+          outputCategoryMask: true,
+          outputConfidenceMasks: false
+        });
+        const segmenterLoadTime = performance.now() - segmenterStartTime;
+        console.log(`ImageSegmenter (${imageSegmenterDelegate}) created successfully in ${segmenterLoadTime.toFixed(2)}ms.`);
+      } catch (initialError) {
+        console.warn(`Failed to create ImageSegmenter with ${imageSegmenterDelegate} delegate:`, initialError);
+        if (!runningOnIOS && imageSegmenterDelegate === "GPU") { // Only try CPU if initial attempt was GPU and not on iOS
+          imageSegmenterDelegate = "CPU";
+          loadingMessage.textContent = 'GPU failed for Image Segmenter. Trying CPU...';
+          try {
+            const segmenterStartTime = performance.now();
+            imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
+              baseOptions: {
+                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+                delegate: "CPU"
+              },
+              runningMode: runningMode,
+              outputCategoryMask: true,
+              outputConfidenceMasks: false
+            });
+            const segmenterLoadTime = performance.now() - segmenterStartTime;
+            console.log(`ImageSegmenter (CPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms after GPU fallback.`);
+          } catch (cpuError) {
+            console.error("Failed to create ImageSegmenter with CPU delegate after GPU failure:", cpuError);
+            loadingMessage.textContent = 'Error: Could not load Image Segmenter (GPU & CPU). Check console.';
+            return;
+          }
+        } else { // If on iOS and CPU failed, or if CPU was already tried
+            console.error(`Failed to create ImageSegmenter with ${imageSegmenterDelegate} delegate:`, initialError);
+            loadingMessage.textContent = `Error: Could not load Image Segmenter (${imageSegmenterDelegate}). Check console.`;
+            return;
+        }
+      }
+
+      let faceLandmarkerDelegate = runningOnIOS ? "CPU" : "GPU";
+      try {
+        loadingMessage.textContent = `Loading Face Landmarker model (${faceLandmarkerDelegate})... (Image Segmenter: ${imageSegmenterDelegate})`;
+        const landmarkerStartTime = performance.now();
+        faceLandmarker = await FaceLandmarker.createFromOptions(visionFilesetResolver, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+            delegate: faceLandmarkerDelegate
+          },
+          outputFaceBlendshapes: false,
+          outputFacialTransformationMatrixes: false,
+          runningMode: runningMode,
+          numFaces: 1
+        });
+        const landmarkerLoadTime = performance.now() - landmarkerStartTime;
+        console.log(`FaceLandmarker (${faceLandmarkerDelegate}) created successfully in ${landmarkerLoadTime.toFixed(2)}ms.`);
+      } catch (initialError) {
+        console.warn(`Failed to create FaceLandmarker with ${faceLandmarkerDelegate} delegate:`, initialError);
+        if (!runningOnIOS && faceLandmarkerDelegate === "GPU") { // Only try CPU if initial attempt was GPU and not on iOS
+          faceLandmarkerDelegate = "CPU";
+          loadingMessage.textContent = `GPU failed for Face Landmarker. Trying CPU... (Image Segmenter: ${imageSegmenterDelegate})`;
+          try {
+            const landmarkerStartTime = performance.now();
+            faceLandmarker = await FaceLandmarker.createFromOptions(visionFilesetResolver, {
+              baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                delegate: "CPU"
+              },
+              outputFaceBlendshapes: false,
+              outputFacialTransformationMatrixes: false,
+              runningMode: runningMode,
+              numFaces: 1
+            });
+            const landmarkerLoadTime = performance.now() - landmarkerStartTime;
+            console.log(`FaceLandmarker (CPU) created successfully in ${landmarkerLoadTime.toFixed(2)}ms after GPU fallback.`);
+          } catch (cpuError) {
+            console.error("Failed to create FaceLandmarker with CPU delegate after GPU failure:", cpuError);
+            loadingMessage.textContent = `Error: Could not load Face Landmarker (GPU & CPU). Image Segmenter: ${imageSegmenterDelegate}. Check console.`;
+            return;
+          }
+        } else { // If on iOS and CPU failed, or if CPU was already tried
+            console.error(`Failed to create FaceLandmarker with ${faceLandmarkerDelegate} delegate:`, initialError);
+            loadingMessage.textContent = `Error: Could not load Face Landmarker (${faceLandmarkerDelegate}). Image Segmenter: ${imageSegmenterDelegate}. Check console.`;
+            return;
+        }
+      }
+      
+      loadingMessage.textContent = `Models loaded (Segmenter: ${imageSegmenterDelegate}, Landmarker: ${faceLandmarkerDelegate}).`;
+      setTimeout(() => {
+          if (loadingMessage.textContent === `Models loaded (Segmenter: ${imageSegmenterDelegate}, Landmarker: ${faceLandmarkerDelegate}).`) {
+            loadingMessage.style.display = 'none';
+          }
+      }, 1500); // Increased timeout slightly
+    }
+
+    async function enableCam() {
+      if (!imageSegmenter || !faceLandmarker) {
+        loadingMessage.textContent = 'Models not yet loaded. Please wait...';
+        loadingMessage.style.display = 'block';
+        await createMediaPipeTasks();
+        if (!imageSegmenter || !faceLandmarker) {
+            console.error("MediaPipe tasks failed to initialize. Cannot enable webcam features.");
+            webcamButton.disabled = false;
+            return;
+        }
+      }
+
+      if (webcamButton.textContent === "ENABLE WEBCAM") {
+        webcamButton.disabled = true;
+        loadingMessage.textContent = 'Accessing webcam...';
+        loadingMessage.style.display = 'block';
+        const constraints = { video: true };
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          
+          const startPredictionLogic = () => {
+            console.log(`Video 'playing' event fired. Raw dimensions: ${video.videoWidth}x${video.videoHeight}`);
+            video.removeEventListener("playing", startPredictionLogic);
+
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+                console.error("CRITICAL: Video dimensions are zero at 'playing' event. Effect will likely fail.");
+                loadingMessage.textContent = 'Error: Video stream has zero dimensions.';
+                loadingMessage.style.display = 'block';
+                webcamButton.disabled = false;
+                isPredicting = false; 
+                return;
+            }
+            
+            canvasElement.width = video.videoWidth;
+            canvasElement.height = video.videoHeight;
+            
+            blurredVideoCanvas.width = video.videoWidth * blurScaleFactor;
+            blurredVideoCanvas.height = video.videoHeight * blurScaleFactor;
+            
+            faceOvalMaskCanvas.width = video.videoWidth * landmarkMaskScaleFactor; 
+            faceOvalMaskCanvas.height = video.videoHeight * landmarkMaskScaleFactor; 
+
+            if (!tempBlurLayerCanvas) {
+                tempBlurLayerCanvas = document.createElement('canvas');
+                tempBlurLayerCtx = tempBlurLayerCanvas.getContext('2d', {willReadFrequently: true, alpha: true});
+            }
+            tempBlurLayerCanvas.width = video.videoWidth;
+            tempBlurLayerCanvas.height = video.videoHeight;
+
+            // Initialize sharpenedSmallCanvas
+            if (!sharpenedSmallCanvas) {
+                sharpenedSmallCanvas = document.createElement('canvas');
+                sharpenedSmallCtx = sharpenedSmallCanvas.getContext('2d'); // willReadFrequently not strictly needed if only doing putImageData
+            }
+            sharpenedSmallCanvas.width = blurredVideoCanvas.width; // Same small dimensions as blurredVideoCanvas
+            sharpenedSmallCanvas.height = blurredVideoCanvas.height;
+
+            loadingMessage.style.display = 'none';
+            webcamButton.textContent = "DISABLE WEBCAM";
+            webcamButton.disabled = false;
+            
+            console.log("[startPredictionLogic] Setting isPredicting = true.");
+            isPredicting = true; 
+            console.log("[startPredictionLogic] Calling predictWebcam for the first time.");
+            predictWebcam();
+          };
+
+          video.addEventListener("playing", startPredictionLogic);
+          
+          video.play().then(() => {
+            console.log("Video play() promise resolved. Playback should be starting or started.");
+          }).catch(e => {
+            console.error("Video play failed:", e);
+            loadingMessage.textContent = 'Error playing video. Check permissions.';
+            webcamButton.disabled = false;
+            video.removeEventListener("playing", startPredictionLogic); 
+          });
+
+        } catch (err) {
+          console.error("Error accessing webcam: ", err);
+          loadingMessage.textContent = 'Error accessing webcam. Please allow access and try again.';
+          webcamButton.disabled = false;
+        }
+      } else {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        webcamButton.textContent = "ENABLE WEBCAM";
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        isPredicting = false;
+      }
+    }
+    webcamButton.addEventListener("click", enableCam);
+    takePhotoButton.addEventListener("click", handleTakePhotoClick);
+
+    async function dataURLtoBlob(dataurl) {
+      const res = await fetch(dataurl);
+      return await res.blob();
+    }
+
+    async function handleTakePhotoClick() {
+      if (!isPredicting || !video.srcObject || video.paused || video.ended) {
+        alert("Please enable the webcam and ensure it's active before taking a photo.");
+        return;
+      }
+      if (canvasElement.width === 0 || canvasElement.height === 0) {
+        alert("Canvas dimensions are zero. Cannot take photo. Please ensure webcam is properly initialized.");
+        return;
+      }
+
+      try {
+        const photoCanvas = document.createElement('canvas');
+        photoCanvas.width = canvasElement.width;
+        photoCanvas.height = canvasElement.height;
+        const photoCtx = photoCanvas.getContext('2d');
+
+        const dataUrl = await new Promise((resolve, reject) => {
+          const backgroundImage = new Image();
+          backgroundImage.src = 'sevBG.png';
+
+          backgroundImage.onload = () => {
+            const cw = photoCanvas.width;
+            const ch = photoCanvas.height;
+            const iw = backgroundImage.naturalWidth;
+            const ih = backgroundImage.naturalHeight;
+
+            const canvasRatio = cw / ch;
+            const imageRatio = iw / ih;
+
+            let dx = 0, dy = 0, dWidth = 0, dHeight = 0;
+
+            if (canvasRatio > imageRatio) {
+              dHeight = ch;
+              dWidth = iw * (ch / ih);
+              dx = (cw - dWidth) / 2;
+              dy = 0;
+            } else {
+              dWidth = cw;
+              dHeight = ih * (cw / iw);
+              dx = 0;
+              dy = (ch - dHeight) / 2;
+            }
+
+            photoCtx.drawImage(backgroundImage, dx, dy, dWidth, dHeight);
+
+            photoCtx.drawImage(canvasElement, 0, 0, cw, ch);
+
+            resolve(photoCanvas.toDataURL("image/png"));
+          };
+
+          backgroundImage.onerror = (err) => {
+            console.error("Error loading background image 'sevBG.png'. Proceeding without custom background.", err);
+            photoCtx.drawImage(canvasElement, 0, 0, photoCanvas.width, photoCanvas.height);
+            resolve(photoCanvas.toDataURL("image/png"));
+          };
+        });
+
+        const blob = await dataURLtoBlob(dataUrl);
+        const fileName = "photo.png";
+        const file = new File([blob], fileName, { type: "image/png" });
+        
+        const shareData = {
+          files: [file],
+          title: "My SEV Look",
+          text: "You just tried on #The15MinFace by SEV ✨\nOur signature laser facial. Low effort. High glow.", // MODIFIED: Ensured sparkle emoji is ✨
+        };
+
+        if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          console.log("Photo shared successfully or share dialog opened.");
+        } else {
+          console.warn("Web Share API not supported or cannot share this data. Falling back to download.");
+          const link = document.createElement("a");
+          link.href = dataUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          alert("Photo downloaded as Web Share is not available.");
+        }
+      } catch (error) {
+        console.error("Error taking or sharing photo:", error);
+        alert(`Error: ${error.message}`);
+        if (error.name !== 'AbortError') {
+            const dataUrl = canvasElement.toDataURL("image/png");
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = "photo_fallback.png";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            alert("Sharing failed. Photo downloaded instead.");
+        }
+      }
+    }
+
+    function applySharpenEffectJS(sourceCtx, sharpenAmount) {
+      const width = sourceCtx.canvas.width;
+      const height = sourceCtx.canvas.height;
+      const S = sharpenAmount;
+      console.log(`[JS Sharpen] applySharpenEffectJS called. Width: ${width}, Height: ${height}, SharpenAmount (S): ${S}`);
+
+      const srcData = sourceCtx.getImageData(0, 0, width, height);
+      console.log(`[JS Sharpen] Got source ImageData. Length: ${srcData.data.length}`);
+
+      if (S === 0) {
+        console.log("[JS Sharpen] S is 0, returning original data.");
+        return srcData;
+      }
+
+      const srcPixels = srcData.data;
+      const dstImageData = sourceCtx.createImageData(width, height); 
+      const dstPixels = dstImageData.data;
+
+      // Kernel for sharpen: 0 -S 0, -S 1+4S -S, 0 -S 0
+      const kernel = [
+          [0, -S, 0],
+          [-S, 1 + 4 * S, -S],
+          [0, -S, 0]
+      ];
+
+      const sampleX = Math.floor(width / 2);
+      const sampleY = Math.floor(height / 2);
+      const sampleIndex = (sampleY * width + sampleX) * 4;
+
+      if (srcPixels.length > sampleIndex + 3) {
+        console.log(`[JS Sharpen] Before - Sample pixel at [${sampleX},${sampleY}] (R,G,B,A): ${srcPixels[sampleIndex]}, ${srcPixels[sampleIndex+1]}, ${srcPixels[sampleIndex+2]}, ${srcPixels[sampleIndex+3]}`);
+      }
+
+      for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+              let r = 0, g = 0, b = 0;
+              const baseOutputIndex = (y * width + x) * 4;
+
+              for (let ky = -1; ky <= 1; ky++) {
+                  for (let kx = -1; kx <= 1; kx++) {
+                      const currentKernelVal = kernel[ky + 1][kx + 1];
+                      if (currentKernelVal === 0) continue; 
+
+                      const pixelY = y + ky;
+                      const pixelX = x + kx;
+
+                      // Clamp coordinates to be within bounds (edge handling)
+                      const clampedY = Math.max(0, Math.min(height - 1, pixelY));
+                      const clampedX = Math.max(0, Math.min(width - 1, pixelX));
+                      
+                      const srcOffset = (clampedY * width + clampedX) * 4;
+                      
+                      r += srcPixels[srcOffset] * currentKernelVal;
+                      g += srcPixels[srcOffset + 1] * currentKernelVal;
+                      b += srcPixels[srcOffset + 2] * currentKernelVal;
+                  }
+              }
+
+              dstPixels[baseOutputIndex] = Math.max(0, Math.min(255, r));
+              dstPixels[baseOutputIndex + 1] = Math.max(0, Math.min(255, g));
+              dstPixels[baseOutputIndex + 2] = Math.max(0, Math.min(255, b));
+              dstPixels[baseOutputIndex + 3] = srcPixels[baseOutputIndex + 3]; // Preserve alpha
+          }
+      }
+
+      if (dstPixels.length > sampleIndex + 3) {
+        console.log(`[JS Sharpen] After - Sample pixel at [${sampleX},${sampleY}] (R,G,B,A): ${dstPixels[sampleIndex]}, ${dstPixels[sampleIndex+1]}, ${dstPixels[sampleIndex+2]}, ${dstPixels[sampleIndex+3]}`);
+      }
+      console.log("[JS Sharpen] Convolution finished, returning destination ImageData.");
+      return dstImageData;
+    }
+
+    function drawLandmarkPolygonGlobal(landmarks, landmarkConnections, targetCtx, targetCanvas) {
+      if (landmarks && landmarkConnections && landmarkConnections.length > 0) {
+        targetCtx.beginPath();
+        const firstLandmarkIndex = landmarkConnections[0].start;
+        if (landmarks[firstLandmarkIndex]) {
+          const firstPoint = landmarks[firstLandmarkIndex];
+          targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
+          for (const conn of landmarkConnections) {
+            const endLandmarkIndex = conn.end;
+            if (landmarks[endLandmarkIndex]) {
+              const endPoint = landmarks[endLandmarkIndex];
+              targetCtx.lineTo(endPoint.x * targetCanvas.width, endPoint.y * targetCanvas.height);
+            } else {
+              console.warn(`Landmark index ${endLandmarkIndex} not found in drawLandmarkPolygonGlobal.`);
+            }
+          }
+          targetCtx.closePath();
+          targetCtx.fill();
+        } else {
+          console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point in drawLandmarkPolygonGlobal.`);
+        }
+      }
+    }
+
+    let lastVideoTime = -1;
+    let isPredicting = false;
+
+    async function predictWebcam() {
+      const forcedSharpenLevel = sharpenLevel; // Use the global sharpenLevel
+
+      console.log(`[predictWebcam START] isPredicting: ${isPredicting}, video.paused: ${video.paused}, video.ended: ${video.ended}, video.readyState: ${video.readyState}, sharpenLevel: ${forcedSharpenLevel}`);
+
+      if (!isPredicting || !video.srcObject || video.paused || video.ended) {
+        isPredicting = false;
+        console.log("[predictWebcam] Loop stopping: initial check failed (not predicting, no src, paused, or ended).");
+        return;
+      }
+
+      if (video.readyState < video.HAVE_ENOUGH_DATA || !imageSegmenter || !faceLandmarker) {
+          console.log(`[predictWebcam] Video not ready (readyState ${video.readyState}) or models not loaded. Retrying next frame.`);
+          if (isPredicting) requestAnimationFrame(predictWebcam);
+          return;
+      }
+
+      let startTimeMs = performance.now();
+      let segmentationResultsToClose = null;
+
+      if (video.currentTime !== lastVideoTime) {
+        lastVideoTime = video.currentTime;
+        
+        const segmentationResults = imageSegmenter.segmentForVideo(video, startTimeMs);
+        if (segmentationResults && segmentationResults.categoryMask) {
+            segmentationResultsToClose = segmentationResults.categoryMask;
+        }
+        console.log("Segmentation results:", segmentationResults);
+        const landmarkResults = faceLandmarker.detectForVideo(video, startTimeMs);
+        console.log("Landmark results:", landmarkResults);
+
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+        // --- MODIFIED DRAWING LOGIC ---
+
+        // 1. Draw the fully sharpened video as the base layer
+        // 1a. Draw current video to a small canvas for sharpening
+        blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+        blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+
+        // 1b. Apply maximum sharpening (sharpenLevel is fixed at 1.0)
+        const sharpenedImageData = applySharpenEffectJS(blurredVideoCtx, forcedSharpenLevel);
+        sharpenedSmallCtx.putImageData(sharpenedImageData, 0, 0);
+
+        // 1c. Draw the small sharpened image scaled up to the main canvas
+        canvasCtx.drawImage(sharpenedSmallCanvas, 0, 0, sharpenedSmallCanvas.width, sharpenedSmallCanvas.height, 0, 0, canvasElement.width, canvasElement.height);
+
+        // 2. If face landmarks are available, draw the original (unsharpened) face oval on top
+        if (landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
+          const landmarks = landmarkResults.faceLandmarks[0];
+
+          // 2a. Update faceOvalMaskCanvas
+          faceOvalMaskCtx.clearRect(0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height);
+          faceOvalMaskCtx.fillStyle = 'white';
+          // Call the global helper function to draw the face oval
+          drawLandmarkPolygonGlobal(landmarks, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, faceOvalMaskCtx, faceOvalMaskCanvas);
+
+          // 2b. Use tempBlurLayerCanvas to prepare the unsharpened face oval
+          tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+          
+          // 2c. Draw the original video onto tempBlurLayerCanvas
+          tempBlurLayerCtx.drawImage(video, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+          
+          // 2d. Mask this with the faceOvalMaskCanvas (scaled)
+          tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
+          tempBlurLayerCtx.drawImage(faceOvalMaskCanvas, 0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+          tempBlurLayerCtx.globalCompositeOperation = 'source-over';
+
+          // 2e. Draw the unsharpened face oval (from tempBlurLayerCanvas) onto the main canvas
+          canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
+        }
+        
+        // --- END OF MODIFIED DRAWING LOGIC ---
+      }
+      
+      if(segmentationResultsToClose){
+        try {
+            segmentationResultsToClose.close();
+        } catch(e){
+            console.warn("Error closing categoryMask:", e);
+        }
+      }
+
+      if (isPredicting) {
+        window.requestAnimationFrame(predictWebcam);
+      } else {
+        console.log("[predictWebcam END] Not predicting, loop will stop.");
+      }
+    }
+  </script>
+</body>
+</html>
