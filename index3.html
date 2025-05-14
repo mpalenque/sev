@@ -204,12 +204,13 @@
 
       // --- MODIFIED ImageSegmenter Delegate Logic ---
       let imageSegmenterDelegate = "GPU"; // Default to GPU
+      const newModelPath = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"; // CHANGED MODEL to float16 version
       try {
         loadingMessage.textContent = `Loading Image Segmenter model (GPU)...`;
         const segmenterStartTime = performance.now();
         imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
           baseOptions: {
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+            modelAssetPath: newModelPath, // CHANGED MODEL PATH
             delegate: "GPU"
           },
           runningMode: runningMode,
@@ -217,16 +218,16 @@
           outputConfidenceMasks: false
         });
         const segmenterLoadTime = performance.now() - segmenterStartTime;
-        console.log(`ImageSegmenter (GPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms.`);
+        console.log(`ImageSegmenter (GPU) with ${newModelPath} created successfully in ${segmenterLoadTime.toFixed(2)}ms.`);
       } catch (gpuError) {
-        console.warn(`Failed to create ImageSegmenter with GPU delegate:`, gpuError);
+        console.warn(`Failed to create ImageSegmenter with GPU delegate (${newModelPath}):`, gpuError);
         imageSegmenterDelegate = "CPU"; // Fallback to CPU
         loadingMessage.textContent = 'GPU failed for Image Segmenter. Trying CPU...';
         try {
           const segmenterStartTime = performance.now();
           imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
             baseOptions: {
-              modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+              modelAssetPath: newModelPath, // CHANGED MODEL PATH
               delegate: "CPU"
             },
             runningMode: runningMode,
@@ -234,9 +235,9 @@
             outputConfidenceMasks: false
           });
           const segmenterLoadTime = performance.now() - segmenterStartTime;
-          console.log(`ImageSegmenter (CPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms after GPU fallback.`);
+          console.log(`ImageSegmenter (CPU) with ${newModelPath} created successfully in ${segmenterLoadTime.toFixed(2)}ms after GPU fallback.`);
         } catch (cpuError) {
-          console.error("Failed to create ImageSegmenter with CPU delegate after GPU failure:", cpuError);
+          console.error(`Failed to create ImageSegmenter with CPU delegate (${newModelPath}) after GPU failure:`, cpuError);
           loadingMessage.textContent = 'Error: Could not load Image Segmenter (GPU & CPU). Check console.';
           return;
         }
@@ -315,17 +316,7 @@
           
           const startPredictionLogic = () => {
             console.log(`Video 'playing' event fired. Raw dimensions: ${video.videoWidth}x${video.videoHeight}`);
-            video.removeEventListener("playing", startPredictionLogic);
-        loadingMessage.textContent = 'Accessing webcam...';
-        loadingMessage.style.display = 'block';
-        const constraints = { video: true };
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          video.srcObject = stream;
-          
-          const startPredictionLogic = () => {
-            console.log(`Video 'playing' event fired. Raw dimensions: ${video.videoWidth}x${video.videoHeight}`);
-            video.removeEventListener("playing", startPredictionLogic);
+            video.removeEventListener("playing", startPredictionLogic); // Important to remove listener
 
             if (video.videoWidth === 0 || video.videoHeight === 0) {
                 console.error("CRITICAL: Video dimensions are zero at 'playing' event. Effect will likely fail.");
@@ -352,18 +343,16 @@
             tempBlurLayerCanvas.width = video.videoWidth;
             tempBlurLayerCanvas.height = video.videoHeight;
 
-            // Initialize sharpenedSmallCanvas
             if (!sharpenedSmallCanvas) {
                 sharpenedSmallCanvas = document.createElement('canvas');
-                sharpenedSmallCtx = sharpenedSmallCanvas.getContext('2d'); // willReadFrequently not strictly needed if only doing putImageData
+                sharpenedSmallCtx = sharpenedSmallCanvas.getContext('2d');
             }
-            sharpenedSmallCanvas.width = blurredVideoCanvas.width; // Same small dimensions as blurredVideoCanvas
+            sharpenedSmallCanvas.width = blurredVideoCanvas.width;
             sharpenedSmallCanvas.height = blurredVideoCanvas.height;
 
-            // Initialize processedPersonCanvas (ADDED)
             if (!processedPersonCanvas) {
                 processedPersonCanvas = document.createElement('canvas');
-                processedPersonCtx = processedPersonCanvas.getContext('2d', {willReadFrequently: true, alpha: true}); // alpha:true is important
+                processedPersonCtx = processedPersonCanvas.getContext('2d', {willReadFrequently: true, alpha: true});
             }
             processedPersonCanvas.width = video.videoWidth;
             processedPersonCanvas.height = video.videoHeight;
@@ -386,7 +375,7 @@
             console.error("Video play failed:", e);
             loadingMessage.textContent = 'Error playing video. Check permissions.';
             webcamButton.disabled = false;
-            video.removeEventListener("playing", startPredictionLogic); 
+            video.removeEventListener("playing", startPredictionLogic); // Clean up listener on error too
           });
 
         } catch (err) {
@@ -395,13 +384,17 @@
           webcamButton.disabled = false;
         }
       } else {
-        video.srcObject.getTracks().forEach(track => track.stop());
-        video.srcObject = null;
+        if (video.srcObject) { // Check if srcObject exists before trying to operate on it
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
         webcamButton.textContent = "ENABLE WEBCAM";
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
         isPredicting = false;
+        console.log("[enableCam] Webcam disabled, isPredicting set to false.");
       }
     }
+
     webcamButton.addEventListener("click", enableCam);
     takePhotoButton.addEventListener("click", handleTakePhotoClick);
 
@@ -695,8 +688,14 @@
 
             for (let i = 0; i < maskArray.length; i++) {
                 const category = maskArray[i];
-                if (category === 0) { // Category 0 is typically background
-                    data[i * 4 + 3] = 0; // Set alpha to 0 for background pixels
+                // Assuming category 0 is PERSON and category 1 (or other non-zero) is BACKGROUND
+                // This is based on the observed inverted effect. If documented behavior is 0=background, 1=person,
+                // then the original logic was correct and something else was wrong.
+                // However, to fix the observed "background visible, person not visible", we flip the assignments:
+                if (category === 0) { // If this category is currently being treated as background by mistake, but is actually person
+                    data[i * 4 + 3] = 255; // Make PERSON opaque
+                } else { // If this category is currently being treated as person by mistake, but is actually background
+                    data[i * 4 + 3] = 0;   // Make BACKGROUND transparent
                 }
             }
             processedPersonCtx.putImageData(personImageData, 0, 0);
