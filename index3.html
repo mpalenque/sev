@@ -187,7 +187,7 @@
       loadingMessage.textContent = 'Initializing MediaPipe tasks...';
       loadingMessage.style.display = 'block';
       console.log("Attempting to create MediaPipe tasks...");
-      const runningOnIOS = isIOS();
+      const runningOnIOS = isIOS(); // Still useful for logging or other specific tweaks if needed
       console.log("Running on iOS:", runningOnIOS);
 
       let visionFilesetResolver;
@@ -202,59 +202,55 @@
       }
       console.log("FilesetResolver loaded.");
 
-      let imageSegmenterDelegate = runningOnIOS ? "CPU" : "GPU";
+      // --- MODIFIED ImageSegmenter Delegate Logic ---
+      let imageSegmenterDelegate = "GPU"; // Default to GPU
       try {
-        loadingMessage.textContent = `Loading Image Segmenter model (${imageSegmenterDelegate})...`;
+        loadingMessage.textContent = `Loading Image Segmenter model (GPU)...`;
         const segmenterStartTime = performance.now();
         imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
           baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
-            delegate: imageSegmenterDelegate
+            delegate: "GPU"
           },
           runningMode: runningMode,
           outputCategoryMask: true,
           outputConfidenceMasks: false
         });
         const segmenterLoadTime = performance.now() - segmenterStartTime;
-        console.log(`ImageSegmenter (${imageSegmenterDelegate}) created successfully in ${segmenterLoadTime.toFixed(2)}ms.`);
-      } catch (initialError) {
-        console.warn(`Failed to create ImageSegmenter with ${imageSegmenterDelegate} delegate:`, initialError);
-        if (!runningOnIOS && imageSegmenterDelegate === "GPU") { // Only try CPU if initial attempt was GPU and not on iOS
-          imageSegmenterDelegate = "CPU";
-          loadingMessage.textContent = 'GPU failed for Image Segmenter. Trying CPU...';
-          try {
-            const segmenterStartTime = performance.now();
-            imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
-              baseOptions: {
-                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
-                delegate: "CPU"
-              },
-              runningMode: runningMode,
-              outputCategoryMask: true,
-              outputConfidenceMasks: false
-            });
-            const segmenterLoadTime = performance.now() - segmenterStartTime;
-            console.log(`ImageSegmenter (CPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms after GPU fallback.`);
-          } catch (cpuError) {
-            console.error("Failed to create ImageSegmenter with CPU delegate after GPU failure:", cpuError);
-            loadingMessage.textContent = 'Error: Could not load Image Segmenter (GPU & CPU). Check console.';
-            return;
-          }
-        } else { // If on iOS and CPU failed, or if CPU was already tried
-            console.error(`Failed to create ImageSegmenter with ${imageSegmenterDelegate} delegate:`, initialError);
-            loadingMessage.textContent = `Error: Could not load Image Segmenter (${imageSegmenterDelegate}). Check console.`;
-            return;
+        console.log(`ImageSegmenter (GPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms.`);
+      } catch (gpuError) {
+        console.warn(`Failed to create ImageSegmenter with GPU delegate:`, gpuError);
+        imageSegmenterDelegate = "CPU"; // Fallback to CPU
+        loadingMessage.textContent = 'GPU failed for Image Segmenter. Trying CPU...';
+        try {
+          const segmenterStartTime = performance.now();
+          imageSegmenter = await ImageSegmenter.createFromOptions(visionFilesetResolver, {
+            baseOptions: {
+              modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+              delegate: "CPU"
+            },
+            runningMode: runningMode,
+            outputCategoryMask: true,
+            outputConfidenceMasks: false
+          });
+          const segmenterLoadTime = performance.now() - segmenterStartTime;
+          console.log(`ImageSegmenter (CPU) created successfully in ${segmenterLoadTime.toFixed(2)}ms after GPU fallback.`);
+        } catch (cpuError) {
+          console.error("Failed to create ImageSegmenter with CPU delegate after GPU failure:", cpuError);
+          loadingMessage.textContent = 'Error: Could not load Image Segmenter (GPU & CPU). Check console.';
+          return;
         }
       }
 
-      let faceLandmarkerDelegate = runningOnIOS ? "CPU" : "GPU";
+      // --- MODIFIED FaceLandmarker Delegate Logic ---
+      let faceLandmarkerDelegate = "GPU"; // Default to GPU
       try {
-        loadingMessage.textContent = `Loading Face Landmarker model (${faceLandmarkerDelegate})... (Image Segmenter: ${imageSegmenterDelegate})`;
+        loadingMessage.textContent = `Loading Face Landmarker model (GPU)... (Image Segmenter: ${imageSegmenterDelegate})`;
         const landmarkerStartTime = performance.now();
         faceLandmarker = await FaceLandmarker.createFromOptions(visionFilesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-            delegate: faceLandmarkerDelegate
+            delegate: "GPU"
           },
           outputFaceBlendshapes: false,
           outputFacialTransformationMatrixes: false,
@@ -262,35 +258,29 @@
           numFaces: 1
         });
         const landmarkerLoadTime = performance.now() - landmarkerStartTime;
-        console.log(`FaceLandmarker (${faceLandmarkerDelegate}) created successfully in ${landmarkerLoadTime.toFixed(2)}ms.`);
-      } catch (initialError) {
-        console.warn(`Failed to create FaceLandmarker with ${faceLandmarkerDelegate} delegate:`, initialError);
-        if (!runningOnIOS && faceLandmarkerDelegate === "GPU") { // Only try CPU if initial attempt was GPU and not on iOS
-          faceLandmarkerDelegate = "CPU";
-          loadingMessage.textContent = `GPU failed for Face Landmarker. Trying CPU... (Image Segmenter: ${imageSegmenterDelegate})`;
-          try {
-            const landmarkerStartTime = performance.now();
-            faceLandmarker = await FaceLandmarker.createFromOptions(visionFilesetResolver, {
-              baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                delegate: "CPU"
-              },
-              outputFaceBlendshapes: false,
-              outputFacialTransformationMatrixes: false,
-              runningMode: runningMode,
-              numFaces: 1
-            });
-            const landmarkerLoadTime = performance.now() - landmarkerStartTime;
-            console.log(`FaceLandmarker (CPU) created successfully in ${landmarkerLoadTime.toFixed(2)}ms after GPU fallback.`);
-          } catch (cpuError) {
-            console.error("Failed to create FaceLandmarker with CPU delegate after GPU failure:", cpuError);
-            loadingMessage.textContent = `Error: Could not load Face Landmarker (GPU & CPU). Image Segmenter: ${imageSegmenterDelegate}. Check console.`;
-            return;
-          }
-        } else { // If on iOS and CPU failed, or if CPU was already tried
-            console.error(`Failed to create FaceLandmarker with ${faceLandmarkerDelegate} delegate:`, initialError);
-            loadingMessage.textContent = `Error: Could not load Face Landmarker (${faceLandmarkerDelegate}). Image Segmenter: ${imageSegmenterDelegate}. Check console.`;
-            return;
+        console.log(`FaceLandmarker (GPU) created successfully in ${landmarkerLoadTime.toFixed(2)}ms.`);
+      } catch (gpuError) {
+        console.warn(`Failed to create FaceLandmarker with GPU delegate:`, gpuError);
+        faceLandmarkerDelegate = "CPU"; // Fallback to CPU
+        loadingMessage.textContent = `GPU failed for Face Landmarker. Trying CPU... (Image Segmenter: ${imageSegmenterDelegate})`;
+        try {
+          const landmarkerStartTime = performance.now();
+          faceLandmarker = await FaceLandmarker.createFromOptions(visionFilesetResolver, {
+            baseOptions: {
+              modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+              delegate: "CPU"
+            },
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: false,
+            runningMode: runningMode,
+            numFaces: 1
+          });
+          const landmarkerLoadTime = performance.now() - landmarkerStartTime;
+          console.log(`FaceLandmarker (CPU) created successfully in ${landmarkerLoadTime.toFixed(2)}ms after GPU fallback.`);
+        } catch (cpuError) {
+          console.error("Failed to create FaceLandmarker with CPU delegate after GPU failure:", cpuError);
+          loadingMessage.textContent = `Error: Could not load Face Landmarker (GPU & CPU). Image Segmenter: ${imageSegmenterDelegate}. Check console.`;
+          return;
         }
       }
       
@@ -316,6 +306,16 @@
 
       if (webcamButton.textContent === "ENABLE WEBCAM") {
         webcamButton.disabled = true;
+        loadingMessage.textContent = 'Accessing webcam...';
+        loadingMessage.style.display = 'block';
+        const constraints = { video: true };
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          
+          const startPredictionLogic = () => {
+            console.log(`Video 'playing' event fired. Raw dimensions: ${video.videoWidth}x${video.videoHeight}`);
+            video.removeEventListener("playing", startPredictionLogic);
         loadingMessage.textContent = 'Accessing webcam...';
         loadingMessage.style.display = 'block';
         const constraints = { video: true };
@@ -726,4 +726,3 @@
   </script>
 </body>
 </html>
-``` 
