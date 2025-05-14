@@ -22,7 +22,7 @@
     background-size: cover; 
     background-repeat: no-repeat; 
     background-position: center center;
-    overflow-x: hidden; /* Added to prevent horizontal scroll on small overflows */
+    overflow: hidden; /* Prevent all scrolling on the body */
   }
   #liveViewContainer {
     position: relative;
@@ -76,9 +76,39 @@
     color: #ffffff; /* Updated */
   }
   .controls input[type="range"] {
-    width: 200px;
-    accent-color: #a48353; /* Updated */
+    width: 250px; /* Increased width */
+    height: 20px; /* Increased height for the track */
+    accent-color: #a48353; 
+    margin-top: 10px; /* Added margin for better spacing */
+    margin-bottom: 10px; /* Added margin for better spacing */
+    padding: 10px 0; /* Add padding to make the touch area for the track larger vertically */
+    box-sizing: content-box; /* Ensure padding adds to height for touch purposes */
   }
+
+  /* Styles for WebKit (Chrome, Safari, newer Edge) slider thumb */
+  .controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; /* Important to override default styling */
+    appearance: none;
+    width: 40px; /* Further Increased thumb width */
+    height: 40px; /* Further Increased thumb height */
+    background: #a48353;
+    cursor: pointer;
+    border-radius: 50%; /* Circular thumb */
+    border: 2px solid white; /* Optional: adds a border to the thumb */
+    /* Adjust thumb position to align with a taller track if needed 
+       e.g., margin-top: -10px; if track height + padding is tall */
+  }
+
+  /* Styles for Firefox slider thumb */
+  .controls input[type="range"]::-moz-range-thumb {
+    width: 40px; /* Further Increased thumb width */
+    height: 40px; /* Further Increased thumb height */
+    background: #a48353;
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid white; /* Optional: adds a border to the thumb */
+  }
+
   #loadingMessage {
     position: absolute;
     top: 50%;
