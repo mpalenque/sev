@@ -659,14 +659,16 @@
             personOnlyCtx.drawImage(personMaskCanvas, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
             personOnlyCtx.globalCompositeOperation = 'source-over';
 
-            canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height);
+            // canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height); // DIAGNOSTIC: Temporarily disable drawing personOnlyCanvas
             personDrawnSuccessfully = true;
+            console.log("[Diagnostic] personOnlyCanvas was prepared but NOT drawn to main canvas.");
           }
         }
 
         if (!personDrawnSuccessfully) {
           console.warn("[predictWebcam] Person segmentation failed or no mask. Drawing raw video.");
-          canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+          // canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height); // DIAGNOSTIC: Also disable raw video fallback for this test
+          console.log("[Diagnostic] Raw video fallback also SKIPPED.");
         }
 
         if (segmentationResults && segmentationResults.categoryMask && landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
@@ -837,9 +839,11 @@
             tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
             tempBlurLayerCtx.globalCompositeOperation = 'source-over';
 
-            // Draw the tempBlurLayerCanvas (which now contains only the processed skin)
-            // onto the main canvas. This will be drawn over the personOnlyCanvas if it was drawn.
+            // ===== START DIAGNOSTIC: Show ONLY tempBlurLayerCanvas on output canvas =====
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Clear main canvas first
             canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
+            console.log("[Diagnostic] Drawing ONLY tempBlurLayerCanvas to output.");
+            // ===== END DIAGNOSTIC =====
 
           } else {
             console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping custom effect. This is a strong indicator why effect might not be working on iOS."); 
