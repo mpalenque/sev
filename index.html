@@ -637,125 +637,215 @@
         const landmarkResults = faceLandmarker.detectForVideo(video, startTimeMs);
         console.log("Landmark results:", landmarkResults);
 
-        // STEP 1: Draw person segmentation (background removal)
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
         let personDrawnSuccessfully = false;
         if (segmentationResults && segmentationResults.categoryMask) {
-            const fullMask = segmentationResults.categoryMask;
-            const fullMaskPixelData = fullMask.getAsUint8Array();
-            const fullMaskWidth = fullMask.width;
-            const fullMaskHeight = fullMask.height;
+          const fullMask = segmentationResults.categoryMask;
+          const fullMaskPixelData = fullMask.getAsUint8Array();
+          const fullMaskWidth = fullMask.width;
+          const fullMaskHeight = fullMask.height;
 
-            if (fullMaskPixelData && fullMaskWidth > 0 && fullMaskHeight > 0) {
-                if (personMaskCanvas.width !== fullMaskWidth || personMaskCanvas.height !== fullMaskHeight) {
-                    personMaskCanvas.width = fullMaskWidth;
-                    personMaskCanvas.height = fullMaskHeight;
-                }
-                drawMaskFromPixelData(fullMaskPixelData, fullMaskWidth, fullMaskHeight, personMaskCtx, personCategoryIndices);
-
-                personOnlyCtx.clearRect(0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
-                personOnlyCtx.drawImage(video, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
-                personOnlyCtx.globalCompositeOperation = 'destination-in';
-                personOnlyCtx.drawImage(personMaskCanvas, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
-                personOnlyCtx.globalCompositeOperation = 'source-over';
-
-                personDrawnSuccessfully = true;
+          if (fullMaskPixelData && fullMaskWidth > 0 && fullMaskHeight > 0) {
+            if (personMaskCanvas.width !== fullMaskWidth || personMaskCanvas.height !== fullMaskHeight) {
+              personMaskCanvas.width = fullMaskWidth;
+              personMaskCanvas.height = fullMaskHeight;
             }
+            drawMaskFromPixelData(fullMaskPixelData, fullMaskWidth, fullMaskHeight, personMaskCtx, personCategoryIndices);
+
+            personOnlyCtx.clearRect(0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
+            personOnlyCtx.drawImage(video, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
+            personOnlyCtx.globalCompositeOperation = 'destination-in';
+            personOnlyCtx.drawImage(personMaskCanvas, 0, 0, personOnlyCanvas.width, personOnlyCanvas.height);
+            personOnlyCtx.globalCompositeOperation = 'source-over';
+
+            canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height);
+            personDrawnSuccessfully = true;
+          }
         }
 
-        // STEP 2: Apply skin effect if possible
+        if (!personDrawnSuccessfully) {
+          console.warn("[predictWebcam] Person segmentation failed or no mask. Drawing raw video.");
+          canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+        }
+
         if (segmentationResults && segmentationResults.categoryMask && landmarkResults && landmarkResults.faceLandmarks && landmarkResults.faceLandmarks.length > 0) {
-            console.log("CategoryMask available for smoothing:", !!segmentationResults.categoryMask);
-            console.log("FaceLandmarks available for smoothing:", landmarkResults.faceLandmarks.length);
-            const skinMaskForSmoothing = segmentationResults.categoryMask;
-            const skinMaskPixelData = skinMaskForSmoothing.getAsUint8Array();
-            const skinMaskWidth = skinMaskForSmoothing.width;
-            const skinMaskHeight = skinMaskForSmoothing.height;
-            const landmarks = landmarkResults.faceLandmarks[0];
-            console.log(`[iOS Debug] Skin mask dimensions for smoothing: ${skinMaskWidth}x${skinMaskHeight}. Pixel data length: ${skinMaskPixelData ? skinMaskPixelData.length : 'null'}`);
+          console.log("CategoryMask available for smoothing:", !!segmentationResults.categoryMask);
+          console.log("FaceLandmarks available for smoothing:", landmarkResults.faceLandmarks.length);
+          const skinMaskForSmoothing = segmentationResults.categoryMask;
+          const skinMaskPixelData = skinMaskForSmoothing.getAsUint8Array();
+          const skinMaskWidth = skinMaskForSmoothing.width;
+          const skinMaskHeight = skinMaskForSmoothing.height;
+          const landmarks = landmarkResults.faceLandmarks[0];
+          console.log(`[iOS Debug] Skin mask dimensions for smoothing: ${skinMaskWidth}x${skinMaskHeight}. Pixel data length: ${skinMaskPixelData ? skinMaskPixelData.length : 'null'}`); 
 
-            if (skinMaskPixelData && skinMaskWidth > 0 && skinMaskHeight > 0) {
-                console.log("[iOS Debug] Valid skinMaskPixelData found. Proceeding with custom effect generation.");
-                
-                blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
-                blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+          if (skinMaskPixelData && skinMaskWidth > 0 && skinMaskHeight > 0) {
+            console.log("[iOS Debug] Valid skinMaskPixelData found. Proceeding with custom effect generation."); 
+            // Draw video un-blurred onto the smaller blurredVideoCanvas (it now acts as a source)
+            blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+            blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
 
-                if (maskCanvas.width !== skinMaskWidth || maskCanvas.height !== skinMaskHeight) {
-                    maskCanvas.width = skinMaskWidth;
-                    maskCanvas.height = skinMaskHeight;
-                }
-                drawMaskFromPixelData(skinMaskPixelData, skinMaskWidth, skinMaskHeight, maskCanvasCtx, skinCategoryIndices);
+            if (maskCanvas.width !== skinMaskWidth || maskCanvas.height !== skinMaskHeight) {
+                maskCanvas.width = skinMaskWidth;
+                maskCanvas.height = skinMaskHeight;
+            }
+            drawMaskFromPixelData(skinMaskPixelData, skinMaskWidth, skinMaskHeight, maskCanvasCtx, skinCategoryIndices);
 
-                eyeMaskCtx.clearRect(0, 0, eyeMaskCanvas.width, eyeMaskCanvas.height);
-                eyeMaskCtx.fillStyle = 'white';
-                const originalFilterEye = eyeMaskCtx.filter;
-                if (landmarkMaskBlurRadius > 0) {
-                    eyeMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
-                }
-                drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, eyeMaskCtx, eyeMaskCanvas);
-                drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, eyeMaskCtx, eyeMaskCanvas);
-                drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
-                drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
-                drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LIPS, eyeMaskCtx, eyeMaskCanvas);
-                const innerMouthTriangles = [
-                    [78, 95, 88], [78, 178, 87], [95, 178, 96],
-                    [78, 88, 87], [88, 87, 178], [88, 95, 96],
-                    [96, 88, 178]
-                ];
-                innerMouthTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
-                drawTriangleOnMask([185, 292, 61], eyeMaskCtx, eyeMaskCanvas);
-                const specificEyebrowTriangles = [
-                    [107, 55, 65], [63, 46, 52],
-                    [336, 285, 295], [293, 276, 334]
-                ];
-                specificEyebrowTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
-                const additionalEyeVertices = [7,22,23,24,25,26,27,28,29,30,33,56,110,112,130,133,144,145,153,154,155,157,158,159,160,161,163,173,190,243,246,247];
-                drawCustomLandmarkPolygonFromIndices(additionalEyeVertices, eyeMaskCtx, eyeMaskCanvas);
-                const additionalOtherEyeVertices = [249,252,253,254,255,256,257,258,259,260,263,286,339,341,359,362,373,374,380,381,382,384,385,386,387,388,390,398,414,463,466,467];
-                drawCustomLandmarkPolygonFromIndices(additionalOtherEyeVertices, eyeMaskCtx, eyeMaskCanvas);
-                eyeMaskCtx.filter = originalFilterEye;
+            eyeMaskCtx.clearRect(0, 0, eyeMaskCanvas.width, eyeMaskCanvas.height);
+            eyeMaskCtx.fillStyle = 'white';
+            
+            const originalFilterEye = eyeMaskCtx.filter;
+            if (landmarkMaskBlurRadius > 0) {
+                eyeMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
+            }
 
-                faceOvalMaskCtx.clearRect(0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height);
-                faceOvalMaskCtx.fillStyle = 'white';
-                const originalFilterOval = faceOvalMaskCtx.filter;
-                if (landmarkMaskBlurRadius > 0) {
-                    faceOvalMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
-                }
-                drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, faceOvalMaskCtx, faceOvalMaskCanvas);
-                faceOvalMaskCtx.filter = originalFilterOval;
-
-                effectLayerCtx.clearRect(0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-                effectLayerCtx.drawImage(maskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-                effectLayerCtx.globalCompositeOperation = 'destination-in';
-                effectLayerCtx.drawImage(faceOvalMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-                effectLayerCtx.globalCompositeOperation = 'destination-out';
-                effectLayerCtx.drawImage(eyeMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
-                effectLayerCtx.globalCompositeOperation = 'source-over'; // Reset for next draw cycle or if used elsewhere
-
-                // ===== START DIAGNOSTIC: Show ONLY effectLayerCanvas on output canvas =====
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height); // Clear main canvas
-                canvasCtx.drawImage(effectLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
-                console.log("[Diagnostic] Drawing ONLY effectLayerCanvas to output.");
-                // ===== END DIAGNOSTIC =====
-
-            } else {
-                console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping custom effect.");
-                if (personDrawnSuccessfully) {
-                     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                     canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height);
+            function drawLandmarkPolygon(landmarkConnections, targetCtx, targetCanvas) {
+              if (landmarks && landmarkConnections && landmarkConnections.length > 0) {
+                targetCtx.beginPath();
+                const firstLandmarkIndex = landmarkConnections[0].start;
+                if (landmarks[firstLandmarkIndex]) {
+                  const firstPoint = landmarks[firstLandmarkIndex];
+                  targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
+                  for (const conn of landmarkConnections) {
+                    const endLandmarkIndex = conn.end;
+                    if (landmarks[endLandmarkIndex]) {
+                      const endPoint = landmarks[endLandmarkIndex];
+                      targetCtx.lineTo(endPoint.x * targetCanvas.width, endPoint.y * targetCanvas.height);
+                    } else {
+                      console.warn(`Landmark index ${endLandmarkIndex} not found.`);
+                    }
+                  }
+                  targetCtx.closePath();
+                  targetCtx.fill();
                 } else {
-                     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                     canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                  console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point.`);
                 }
+              }
             }
-        } else {
-            console.warn("[iOS Debug] No valid segmentation mask OR no landmarks found for this frame. Skipping custom effect.");
-            if (personDrawnSuccessfully) {
-                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                 canvasCtx.drawImage(personOnlyCanvas, 0, 0, canvasElement.width, canvasElement.height);
+
+            function drawCustomLandmarkPolygonFromIndices(vertexIndices, targetCtx, targetCanvas) {
+              if (landmarks && vertexIndices && vertexIndices.length > 0) {
+                targetCtx.beginPath();
+                const firstLandmarkIndex = vertexIndices[0];
+                if (landmarks[firstLandmarkIndex]) {
+                  const firstPoint = landmarks[firstLandmarkIndex];
+                  targetCtx.moveTo(firstPoint.x * targetCanvas.width, firstPoint.y * targetCanvas.height);
+                  for (let i = 1; i < vertexIndices.length; i++) {
+                    const landmarkIndex = vertexIndices[i];
+                    if (landmarks[landmarkIndex]) {
+                      const point = landmarks[landmarkIndex];
+                      targetCtx.lineTo(point.x * targetCanvas.width, point.y * targetCanvas.height);
+                    } else {
+                      console.warn(`Landmark index ${landmarkIndex} not found in custom list.`);
+                    }
+                  }
+                  targetCtx.closePath();
+                  targetCtx.fill();
+                } else {
+                  console.warn(`Landmark index ${firstLandmarkIndex} not found for starting point in custom list.`);
+                }
+              }
+            }
+
+            function drawTriangleOnMask(vertexIndices, targetCtx, targetCanvas) {
+              if (landmarks && vertexIndices && vertexIndices.length === 3) {
+                const points = vertexIndices.map(index => landmarks[index]);
+                if (points.every(p => p)) {
+                  targetCtx.beginPath();
+                  targetCtx.moveTo(points[0].x * targetCanvas.width, points[0].y * targetCanvas.height);
+                  targetCtx.lineTo(points[1].x * targetCanvas.width, points[1].y * targetCanvas.height);
+                  targetCtx.lineTo(points[2].x * targetCanvas.width, points[2].y * targetCanvas.height);
+                  targetCtx.closePath();
+                  targetCtx.fill();
+                } else {
+                  console.warn(`Invalid landmark index in triangle: ${vertexIndices}`);
+                }
+              }
+            }
+
+            drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, eyeMaskCtx, eyeMaskCanvas);
+            drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, eyeMaskCtx, eyeMaskCanvas);
+            drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
+            drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, eyeMaskCtx, eyeMaskCanvas);
+            drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_LIPS, eyeMaskCtx, eyeMaskCanvas);
+
+            const innerMouthTriangles = [
+              [78, 95, 88], [78, 178, 87], [95, 178, 96],
+              [78, 88, 87], [88, 87, 178], [88, 95, 96],
+              [96, 88, 178]
+            ];
+            innerMouthTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
+            drawTriangleOnMask([185, 292, 61], eyeMaskCtx, eyeMaskCanvas);
+            const specificEyebrowTriangles = [
+              [107, 55, 65], [63, 46, 52],
+              [336, 285, 295], [293, 276, 334]
+            ];
+            specificEyebrowTriangles.forEach(triangle => drawTriangleOnMask(triangle, eyeMaskCtx, eyeMaskCanvas));
+
+            const additionalEyeVertices = [7,22,23,24,25,26,27,28,29,30,33,56,110,112,130,133,144,145,153,154,155,157,158,159,160,161,163,173,190,243,246,247];
+            drawCustomLandmarkPolygonFromIndices(additionalEyeVertices, eyeMaskCtx, eyeMaskCanvas);
+
+            const additionalOtherEyeVertices = [249,252,253,254,255,256,257,258,259,260,263,286,339,341,359,362,373,374,380,381,382,384,385,386,387,388,390,398,414,463,466,467];
+            drawCustomLandmarkPolygonFromIndices(additionalOtherEyeVertices, eyeMaskCtx, eyeMaskCanvas);
+
+            eyeMaskCtx.filter = originalFilterEye;
+
+            faceOvalMaskCtx.clearRect(0, 0, faceOvalMaskCanvas.width, faceOvalMaskCanvas.height);
+            faceOvalMaskCtx.fillStyle = 'white';
+            
+            const originalFilterOval = faceOvalMaskCtx.filter;
+            if (landmarkMaskBlurRadius > 0) {
+                faceOvalMaskCtx.filter = `blur(${landmarkMaskBlurRadius}px)`;
+            }
+            drawLandmarkPolygon(FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, faceOvalMaskCtx, faceOvalMaskCanvas);
+            faceOvalMaskCtx.filter = originalFilterOval;
+
+            effectLayerCtx.clearRect(0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
+            effectLayerCtx.drawImage(maskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
+            
+            effectLayerCtx.globalCompositeOperation = 'destination-in';
+            effectLayerCtx.drawImage(faceOvalMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
+            
+            effectLayerCtx.globalCompositeOperation = 'destination-out';
+            effectLayerCtx.drawImage(eyeMaskCanvas, 0, 0, effectLayerCanvas.width, effectLayerCanvas.height);
+            
+            effectLayerCtx.globalCompositeOperation = 'source-over';
+
+            tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+            tempBlurLayerCtx.filter = 'none'; // Ensure no CSS/SVG filters are active
+
+            // Draw current video frame to the small blurredVideoCanvas
+            blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+            blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
+
+            if (sharpenLevel > 0) {
+                const sharpenedImageData = applySharpenEffectJS(blurredVideoCtx, sharpenLevel);
+                // Put the sharpened data onto the small intermediate canvas
+                sharpenedSmallCtx.putImageData(sharpenedImageData, 0, 0);
+                // Draw the small sharpened canvas onto the full-size tempBlurLayerCanvas, scaling it up
+                tempBlurLayerCtx.drawImage(sharpenedSmallCanvas, 0, 0, sharpenedSmallCanvas.width, sharpenedSmallCanvas.height, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+                console.log(`[Effect Debug] Applied JS Sharpen. Level: ${sharpenLevel}`);
             } else {
-                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                 canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                // If sharpenLevel is 0, draw the original (scaled-down) video frame to tempBlurLayerCanvas, scaling it up
+                tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+                console.log(`[Effect Debug] Sharpen level is 0, drawing unsharpened scaled video.`);
             }
+            
+            // Restore original masking and drawing logic
+            // Now apply the effect mask (skin mask, excluding eyes/mouth/oval)
+            tempBlurLayerCtx.globalCompositeOperation = 'destination-in';
+            tempBlurLayerCtx.drawImage(effectLayerCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
+            tempBlurLayerCtx.globalCompositeOperation = 'source-over';
+
+            // Draw the tempBlurLayerCanvas (which now contains only the processed skin)
+            // onto the main canvas. This will be drawn over the personOnlyCanvas if it was drawn.
+            canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
+
+          } else {
+            console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping custom effect. This is a strong indicator why effect might not be working on iOS."); 
+          }
+        } else {
+            console.warn("[iOS Debug] No valid segmentation mask OR no landmarks found for this frame. Skipping custom effect."); 
         }
       }
       
@@ -776,4 +866,3 @@
   </script>
 </body>
 </html>
-``` 
