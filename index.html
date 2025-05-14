@@ -94,7 +94,11 @@
 </style>
 </head>
 <body>
-  
+  <svg style="position:absolute; width:0; height:0; visibility:hidden;">
+    <filter id="sharpenFilter">
+      <feConvolveMatrix id="feConvMatrix" order="3 3" kernelMatrix="0 0 0 0 1 0 0 0 0" preserveAlpha="true"/>
+    </filter>
+  </svg>
 
   <div id="liveViewContainer">
     <video id="webcam" autoplay playsinline></video>
@@ -105,8 +109,8 @@
   <div class="controls">
     <button id="webcamButton">ENABLE WEBCAM</button>
     <button id="takePhotoButton" style="margin-top: 10px;">TAKE PHOTO</button>
-    <label for="blurSlider">Blur Amount:</label>
-    <input type="range" id="blurSlider" min="0" max="1" step="0.01" value="0.8">
+    <label for="sharpenSlider">Sharpen Level:</label>
+    <input type="range" id="sharpenSlider" min="0" max="1" step="0.01" value="0.2">
   </div>
 
   <script type="module">
@@ -122,23 +126,15 @@
     const webcamButton = document.getElementById("webcamButton");
     const loadingMessage = document.getElementById("loadingMessage");
     const takePhotoButton = document.getElementById("takePhotoButton");
-    const blurSlider = document.getElementById("blurSlider");
+    const sharpenSlider = document.getElementById("sharpenSlider"); // Changed from blurSlider
+    const feConvMatrixElement = document.getElementById("feConvMatrix"); // Get feConvolveMatrix element
 
     const blurScaleFactor = 0.5; 
     const landmarkMaskScaleFactor = 0.5; 
     const landmarkMaskBlurRadius = 3; 
-    const SLIDER_POWER_CURVE = 3; 
-    const RAW_SLIDER_DEFAULT_VALUE = 0.8; // This constant remains but is not used for the direct blurAmount setting below.
-    const SLIDER_MAX_VALUE = 20; // This constant remains but is not used for the direct blurAmount setting below.
 
-    function calculateEffectiveBlur(rawValue, sliderMax, power) {
-      if (sliderMax === 0) return 0; 
-      const normalizedValue = rawValue / sliderMax;
-      return Math.pow(normalizedValue, power) * sliderMax;
-    }
-
-    // Initial blurAmount set by the slider's default value, calculated effectively
-    let blurAmount = calculateEffectiveBlur(parseFloat(blurSlider.value), 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
+    // Initial sharpenLevel set by the slider's default value
+    let sharpenLevel = parseFloat(sharpenSlider.value);
 
     const blurredVideoCanvas = document.createElement("canvas");
     const blurredVideoCtx = blurredVideoCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
@@ -362,14 +358,22 @@
     webcamButton.addEventListener("click", enableCam);
     takePhotoButton.addEventListener("click", handleTakePhotoClick);
 
-    blurSlider.addEventListener("input", (event) => {
-      const rawValue = parseFloat(event.target.value); // Slider value is 0 to 1
-      // Map the 0-1 slider range to a 0-SLIDER_MAX_VALUE effective blur range
-      // The calculateEffectiveBlur function expects a rawValue that is part of its own max (which is 1 here for the slider)
-      // and then we scale it up by SLIDER_MAX_VALUE.
-      blurAmount = calculateEffectiveBlur(rawValue, 1, SLIDER_POWER_CURVE) * SLIDER_MAX_VALUE;
-      console.log(`Blur slider changed. Raw: ${rawValue}, Calculated blurAmount: ${blurAmount}`);
+    sharpenSlider.addEventListener("input", (event) => { // Changed from blurSlider
+      sharpenLevel = parseFloat(event.target.value); // sharpenLevel is 0 to 1
+      const S = sharpenLevel;
+      // Kernel for sharpen: 0 -S 0, -S 1+4S -S, 0 -S 0
+      const kernel = `0 ${-S} 0 ${-S} ${1 + 4 * S} ${-S} 0 ${-S} 0`;
+      feConvMatrixElement.setAttribute('kernelMatrix', kernel);
+      console.log(`Sharpen slider changed. sharpenLevel: ${sharpenLevel}, Kernel: ${kernel}`);
     });
+
+    // Initialize kernelMatrix on load based on initial slider value
+    (function initializeSharpenFilter(){
+        const initialS = sharpenLevel;
+        const initialKernel = `0 ${-initialS} 0 ${-initialS} ${1 + 4 * initialS} ${-initialS} 0 ${-initialS} 0`;
+        feConvMatrixElement.setAttribute('kernelMatrix', initialKernel);
+        console.log(`Initial sharpenLevel: ${initialS}, Initial Kernel: ${initialKernel}`);
+    })();
 
     async function dataURLtoBlob(dataurl) {
       const res = await fetch(dataurl);
@@ -512,7 +516,7 @@
     let isPredicting = false;
 
     async function predictWebcam() {
-      console.log(`[predictWebcam START] isPredicting: ${isPredicting}, video.paused: ${video.paused}, video.ended: ${video.ended}, video.readyState: ${video.readyState}, blurAmount: ${blurAmount}`);
+      console.log(`[predictWebcam START] isPredicting: ${isPredicting}, video.paused: ${video.paused}, video.ended: ${video.ended}, video.readyState: ${video.readyState}, sharpenLevel: ${sharpenLevel}`);
 
       if (!isPredicting || !video.srcObject || video.paused || video.ended) {
         isPredicting = false;
@@ -580,14 +584,13 @@
           const skinMaskWidth = skinMaskForSmoothing.width;
           const skinMaskHeight = skinMaskForSmoothing.height;
           const landmarks = landmarkResults.faceLandmarks[0];
-          console.log(`[iOS Debug] Skin mask dimensions for smoothing: ${skinMaskWidth}x${skinMaskHeight}. Pixel data length: ${skinMaskPixelData ? skinMaskPixelData.length : 'null'}`); // Enhanced log
+          console.log(`[iOS Debug] Skin mask dimensions for smoothing: ${skinMaskWidth}x${skinMaskHeight}. Pixel data length: ${skinMaskPixelData ? skinMaskPixelData.length : 'null'}`); 
 
           if (skinMaskPixelData && skinMaskWidth > 0 && skinMaskHeight > 0) {
-            console.log("[iOS Debug] Valid skinMaskPixelData found. Proceeding with blur effect generation."); // New log
+            console.log("[iOS Debug] Valid skinMaskPixelData found. Proceeding with custom effect generation."); 
             // Draw video un-blurred onto the smaller blurredVideoCanvas (it now acts as a source)
             blurredVideoCtx.clearRect(0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
             blurredVideoCtx.drawImage(video, 0, 0, blurredVideoCanvas.width, blurredVideoCanvas.height);
-            // The filter application on blurredVideoCtx is removed from here.
 
             if (maskCanvas.width !== skinMaskWidth || maskCanvas.height !== skinMaskHeight) {
                 maskCanvas.width = skinMaskWidth;
@@ -717,18 +720,17 @@
 
             tempBlurLayerCtx.clearRect(0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
 
-            // Apply blur directly on the full-resolution tempBlurLayerCtx before drawing and masking
+            // Apply sharpen filter directly on the full-resolution tempBlurLayerCtx before drawing and masking
             const originalFilterTempBlur = tempBlurLayerCtx.filter;
             tempBlurLayerCtx.filter = 'none'; // Explicitly reset before applying new filter
-            if (blurAmount > 0) {
-                tempBlurLayerCtx.filter = `blur(${blurAmount}px)`;
-                console.log(`[iOS Debug] Applied blur filter: ${blurAmount}px to tempBlurLayerCtx`); // New log
+            if (sharpenLevel > 0) { // Check sharpenLevel instead of blurAmount
+                tempBlurLayerCtx.filter = 'url(#sharpenFilter)'; // Apply SVG sharpen filter
+                console.log(`[Effect Debug] Applied sharpen filter. Level: ${sharpenLevel}`); 
             } else {
-                console.log(`[iOS Debug] Blur amount is 0 or less, no blur filter applied to tempBlurLayerCtx`); // New log
+                console.log(`[Effect Debug] Sharpen level is 0 or less, no sharpen filter applied to tempBlurLayerCtx`); 
             }
 
             // Draw the (potentially scaled up) video frame from blurredVideoCanvas to tempBlurLayerCanvas.
-            // The blur filter on tempBlurLayerCtx will apply to this drawing operation.
             tempBlurLayerCtx.drawImage(blurredVideoCanvas, 0, 0, tempBlurLayerCanvas.width, tempBlurLayerCanvas.height);
 
             // Reset filter on tempBlurLayerCtx so it doesn't affect subsequent compositing operations
@@ -742,10 +744,10 @@
             canvasCtx.drawImage(tempBlurLayerCanvas, 0, 0, canvasElement.width, canvasElement.height);
 
           } else {
-            console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping smoothing effect. This is a strong indicator why blur might not be working on iOS."); // Enhanced log
+            console.warn("[iOS Debug] skinMaskPixelData for smoothing was INVALID or dimensions were zero. Skipping custom effect. This is a strong indicator why effect might not be working on iOS."); 
           }
         } else {
-            console.warn("[iOS Debug] No valid segmentation mask OR no landmarks found for this frame. Skipping smoothing effect."); // Enhanced log
+            console.warn("[iOS Debug] No valid segmentation mask OR no landmarks found for this frame. Skipping custom effect."); 
         }
       }
       
